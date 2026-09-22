@@ -211,8 +211,14 @@ The `bash` block copies the harness-neutral
 patterns, with a wildcard where a form takes a value. Git and `gh` have
 no rule, so `"*": deny` refuses every `git` and `gh` command; the role
 reaches them only through the `scm` tools. The guard enforces the same
-operations with the project's real values and the current branch; this
-copy refuses early and still holds when plugins do not load.
+operations with the project's real values and the current branch. The
+native copy refuses early for constraints its patterns can express;
+the guard supplies the state and argument-value checks. OpenCode's
+simple wildcard matcher cannot express the constraint that
+`--content-file` and `--impact-file` may be followed only by `-` while
+also allowing the safe standard-input form. The native rule therefore
+does not provide defense in depth for those two values; the shared guard
+is the sole enforcement and must refuse every other value.
 
 ```yaml
 bash:
@@ -228,7 +234,11 @@ bash:
 A pattern without `*` matches only that exact command. A pattern with
 `*` still matches a longer command, so the guard refuses every option
 that #30's grammar does not show, and a registration whose change set
-is not the current branch's.
+is not the current branch's. In particular, the native
+`"ears-manager *": allow` rule must not be treated as permission to pass
+`--content-file PATH` or `--impact-file PATH`; those restrictions rely on
+the guard's argument-level parsing. If the guard plugin is unavailable,
+the binding cannot safely run the governed shell path.
 
 OpenCode matches these patterns against the whole command text,
 here-document bodies included, but does not look inside an output
