@@ -236,7 +236,7 @@ A pattern without `*` matches only that exact command. A pattern with
 that #30's grammar does not show, and a registration whose change set
 is not the current branch's. In particular, the native
 `"ears-manager *": allow` rule must not be treated as permission to pass
-`--content-file PATH` or `--impact-file PATH`; those restrictions rely on
+`--content-file <path>` or `--impact-file <path>`; those restrictions rely on
 the guard's argument-level parsing. If the guard plugin is unavailable,
 the binding cannot safely run the governed shell path.
 

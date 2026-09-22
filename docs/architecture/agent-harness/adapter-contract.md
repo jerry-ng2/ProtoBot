@@ -668,24 +668,22 @@ document names them, and guard rules 5 and 6 treat them as reads.
    file below it, counts as a load of `<name>` in every harness. The
    outside-the-project refusal is what keeps the `gh` store and the
    harness's own credential file out of reach.
-6. **The role's shell commands.** Under the Drafting Table role, a
-   command that is neither one of the
-   [shell operations](#shell-operations) in its exact form nor a read
-   form of the harness's [vocabulary row](#tool-vocabulary) is
-   refused. The guard reads the
-   current branch with `git rev-parse --abbrev-ref HEAD`, the project
-   fields from `project.yaml`, and the change sets through
-   `ears-manager`, and refuses a registration whose `<nnnnn>` is not
-   the change set of `<branch>`. Before matching any initialization
-   branch form, it also refuses that form when `.protobot/` already
-   exists. Thus `git switch -c <prefix>00001-project-init <default>`
-   cannot be reused after initialization, even if the branch does not
-   exist and all of its placeholders otherwise match. The only
-   initialization route is `scm branch_init` while `.protobot/` is
-   absent, as rule 1 and the Source Control Manager contract require.
-   The current SCM-only binding rejects Git as a non-shell operation as
-   well; this lifetime check is independent so a compatibility parser
-   cannot re-enable the form.
+6. **The role's shell commands.** Under the Drafting Table role, the
+    guard first recognizes the initialization-branch shape for its
+    lifetime check:
+    `git switch -c <prefix>00001-project-init <default>`. If
+    `.protobot/` already exists, it refuses that form before applying the
+    generic shell-operation check. If `.protobot/` is absent, it falls
+    through to that check: raw Git remains outside the allowed shell
+    operations. For every other command, a command that is neither one of
+    the [shell operations](#shell-operations) in its exact form nor a read
+    form of the harness's [vocabulary row](#tool-vocabulary) is refused.
+    The guard reads the current branch with `git rev-parse`, the project
+    fields from `project.yaml`, and the change sets through `ears-manager`,
+    and refuses a registration whose `<nnnnn>` is not the change set of
+    `<branch>`. The only initialization route is `scm branch_init` while
+    `.protobot/` is absent, as rule 1 and the Source Control Manager
+    contract require.
 7. **Other roles' shell commands.** A command whose output redirection
    targets a guarded path written from the project root, such as
    `> docs/vision.md`, is refused. A path in any other position is not
@@ -1218,7 +1216,7 @@ negative checks of the [SCM's fixture][scm-fixture]:
 | Drafting Table | `source-control-manager publish` | Not a shell operation: the role reaches the SCM only through the `scm` tools |
 | Drafting Table | An `scm` tool that the manifest does not list | Not a Drafting Table operation |
 | Drafting Table | `register-approved-change-set --change-set CS-00004` | Not the change set of the current branch |
-| Drafting Table (initialized fixture clone) | `git switch -c cs/00001-project-init main` | Initialization branch form refused by rule 6 because `.protobot/` already exists |
+| Drafting Table | `git switch -c cs/00001-project-init main`, in an initialized fixture clone | Initialization branch form refused before the generic non-shell-operation refusal because `.protobot/` already exists |
 | Drafting Table | `ears-manager --output json artifact put --change-set CS-00003 --id vision --kind vision --path docs/vision.md --owner <owner> --content-file ~/.netrc` | `--content-file` with a path |
 | Drafting Table | A `wms` tool that the manifest does not list, such as a lifecycle transition | Not a Drafting Table operation |
 | Drafting Table | `ears-manager --output json requirement add --change-set CS-00003 ... --text "$GH_TOKEN" ...` | Variable expansion |
