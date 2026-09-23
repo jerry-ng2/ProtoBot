@@ -18,44 +18,35 @@
 
 When creating or modifying any numbered rule in `AGENTS.md`, any
 specification document under `docs/`, any skill file under
-`.agents/skills/`, or any future surface added later, agents
+`.agents/skills/`, or any future governed scope added later, agents
 must follow these rules:
 
 1. **Read all sibling entries first.** Before drafting or
-   revising an entry, read every other entry on the same
-   surface. Consistency cannot be verified without knowing
-   what the sibling entries say.
+   revising an entry, read every other entry in the same list
+   or governed collection. Consistency cannot be verified
+   without knowing what the sibling entries say.
 
 2. **Reuse established terminology.** Match the sibling
    entries' terms for the same concepts. An undeclared alias
-   for a term already used on the same surface is a defect.
+   for a term already used in the same list or governed
+   collection is a defect.
 
 3. **Review agents must check sibling-entry terminology.**
-   When reviewing a PR that creates or modifies an entry on
-   a surface, verify that the new or changed entry reuses
-   established sibling terminology rather than inventing an
-   alias. Findings should include terminology drift within
-   the same surface, not only cross-document keyword checks.
+   When reviewing a PR that creates or modifies an entry in
+   a governed scope, verify that the new or changed entry
+   reuses established sibling terminology rather than inventing
+   an alias. Findings should include terminology drift within
+   the same list or governed collection, not only
+   specification-hierarchy keyword checks.
 
-Examples of sibling entries on each surface listed above:
+Examples of sibling entries for each governed scope listed above:
 
 - **Numbered rules in `AGENTS.md`:** the other numbered
   rules in that same list.
 - **Specification documents under `docs/`:** every other
   governed Markdown document under `docs/`.
 - **Skill files under `.agents/skills/`:** every other
-  skill file under `.agents/skills/`. Follow the formatting
-  conventions observed in sibling files. Match
-  backtick-quoting of refs, command syntax style, and
-  structural patterns used by sibling skills. For example,
-  quote git refs as `` `upstream/main` `` rather than
-  leaving them unquoted. Inconsistent formatting with
-  sibling skills is a defect. Match structural formatting
-  conventions, not behavioral fields. Behavioral fields
-  like dispatch parameters must be determined by the
-  skill's own requirements, not copied from siblings.
-  Blindly copying behavioral configuration from a sibling
-  can produce incorrect dispatch or workflow behavior.
+  skill file under `.agents/skills/`.
 
 ## Specification document hierarchy
 
@@ -143,6 +134,25 @@ must follow these rules:
    updated to match.
 
 ## Agent skills
+
+### Rules for creating or modifying skill files
+
+When creating or modifying any skill file under `.agents/skills/`,
+agents must follow these rules:
+
+1. **Follow the formatting conventions observed in sibling files.**
+   Match backtick-quoting of refs, command syntax style, and
+   structural patterns used by sibling skills. For example, quote
+   git refs as `` `upstream/main` `` rather than leaving them
+   unquoted. Inconsistent formatting with sibling skills is a
+   defect.
+
+2. **Match structural conventions, not behavioral fields.**
+   Structural formatting conventions should be matched to siblings,
+   but behavioral fields like dispatch parameters must be determined
+   by the skill's own requirements, not copied from siblings.
+   Blindly copying behavioral configuration from a sibling can
+   produce incorrect dispatch or workflow behavior.
 
 ### Aligning skills with the specification hierarchy
 
