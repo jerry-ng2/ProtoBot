@@ -206,6 +206,15 @@ func TestChangeSetCompareRejectsAgainstOption(t *testing.T) {
 	if code != 4 || !strings.Contains(stdout, "change_set.invalid_base") {
 		t.Fatalf("expected change_set.invalid_base when --against passed, got code %d stdout %s stderr %s", code, stdout, stderr)
 	}
+
+	// Compare usage does not advertise deferred --against option
+	code, stdout, stderr = runCLI(nil, "change-set", "compare", "--help")
+	if code != 0 || strings.Contains(stdout, "--against") {
+		t.Fatalf("compare help advertised deferred --against: %s", stdout)
+	}
+	if stdout != "Usage: ears-manager change-set compare --change-set CS-ID\n" {
+		t.Fatalf("compare help usage = %q", stdout)
+	}
 }
 
 func TestChangeSetCompareFailsOnUnreadableBaseCommit(t *testing.T) {

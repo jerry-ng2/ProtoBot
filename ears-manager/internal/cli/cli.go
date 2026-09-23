@@ -451,7 +451,7 @@ func helpText(args []string) string {
 	case "change-set update":
 		return "Usage: ears-manager change-set update --change-set CS-ID [--intent TEXT] [--affected-interface ID] [--affected-scope SCOPE] [--base-commit FULL-SHA] [--implementation-required true|false] [--implementation-rationale TEXT] [--impact-file PATH|-]\n"
 	case "change-set compare":
-		return "Usage: ears-manager change-set compare --change-set CS-ID [--against FULL-SHA]\n"
+		return "Usage: ears-manager change-set compare --change-set CS-ID\n"
 	default:
 		return "Usage: ears-manager [--output human|json] <command> [<subcommand>] [options]\n\nCommands:\n  check\n  requirement add|list|show|update|retire\n  interface add|list|show\n  artifact get|put\n  change-set create|list|show|update|compare\n  impact\n\nUse --help after a command for command-specific usage.\n"
 	}

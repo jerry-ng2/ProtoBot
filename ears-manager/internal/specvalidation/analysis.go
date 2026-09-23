@@ -239,12 +239,12 @@ func matchReasons(changeSet records.ChangeSet, requirement records.Requirement, 
 		reasons = append(reasons, reason)
 	}
 	for _, interfaceID := range requirement.AppliesTo.Interfaces {
-		if containsString(changeSet.AffectedInterfaces, interfaceID) {
+		if slices.Contains(changeSet.AffectedInterfaces, interfaceID) {
 			add("interface:" + interfaceID)
 		}
 	}
 	for _, scope := range requirement.AppliesTo.Scopes {
-		if containsString(changeSet.AffectedScopes, scope) {
+		if slices.Contains(changeSet.AffectedScopes, scope) {
 			add("scope:" + scope)
 		}
 	}
@@ -524,15 +524,6 @@ func recordedAssessments(values []records.ImpactAssessment) map[string]records.I
 		result[assessment.RequirementID] = assessment
 	}
 	return result
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }
 
 func uniqueSortedStrings(values []string) []string {

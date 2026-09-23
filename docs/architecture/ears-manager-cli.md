@@ -234,9 +234,9 @@ interface add/list/show, artifact get/put, and minimal proposed change-set
 creation. EM-05 adds change-set list/show/update/compare and `impact`,
 including proposed-change-set impact-completeness checks. Project
 initialization, artifact listing, interface updates, immutable `--at`
-reads, and governed branch/commit/pull-request automation remain follow-on
-work. The dispatcher must not claim those remaining operations are
-available.
+reads, explicit `--against` comparison revisions, and governed
+branch/commit/pull-request automation remain follow-on work. The
+dispatcher must not claim those remaining operations are available.
 
 In the first release, `change-set create` allocates the ID, records the base
 commit, and writes the manifest. It does not create or check out the change-set
@@ -393,7 +393,7 @@ impact --change-set CS-ID [--at FULL-SHA]
 `--id` identifies a requirement, interface, or artifact. `--change-set`
 identifies a change set in every command that operates on an existing change
 set. `--at` selects the immutable read revision; `--against` selects the
-comparison baseline.
+comparison baseline (both options are deferred in the initial release).
 
 ---
 
@@ -579,7 +579,7 @@ explicit.
 | `change-set list` | Optional status, interface, scope, and `--at` filters | Proposed/approved manifests sorted by ID | `change_set.read_failed` |
 | `change-set show` | `--change-set CS-ID` and optional `--at` | Complete manifest, derived status, changed/applicable counts, and exact paths, each a file: every registered artifact and every structured requirement and interface record that the change set touches, and its manifest | `change_set.not_found` |
 | `change-set update` | `--change-set CS-ID` plus metadata, base refresh, or complete impact assessment | `before`, `after`, `assessment_status`, and `changed_paths` in the result | `change_set.not_proposed`, `change_set.base_mismatch`, `change_set.invalid_impact`, or validation diagnostics |
-| `change-set compare` | `--change-set CS-ID` and optional `--against` full commit | Deterministic comparison report described below | `change_set.not_found`, `change_set.invalid_base`, or read/validation diagnostics |
+| `change-set compare` | `--change-set CS-ID` and optional `--against` full commit (deferred to follow-on scope) | Deterministic comparison report described below | `change_set.not_found`, `change_set.invalid_base`, or read/validation diagnostics |
 
 In the EM-04 first release, `change-set create` allocates the next unused
 sequence number, records a full 40-character `base_commit`, and writes the
@@ -641,7 +641,8 @@ historical assessment. `check` never repairs files.
 
 `change-set compare` is deterministic and read-only. It compares the
 proposed change set with its `base_commit` by default; `--against` is used for
-an explicit immutable comparison revision. Its result contains:
+an explicit immutable comparison revision (deferred to follow-on scope; passing
+`--against` is rejected with `change_set.invalid_base`). Its result contains:
 
 ```json
 {

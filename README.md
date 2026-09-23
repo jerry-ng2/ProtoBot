@@ -95,8 +95,9 @@ create/list/show/update/compare, and deterministic `impact` analysis. Writes
 are validated against a candidate specification before an atomic file
 transaction is applied; JSON output and exit statuses are deterministic.
 
-Project bootstrap, immutable historical `--at` reads, and governed Git
-branch/commit/pull-request automation remain separate follow-on work.
+Project bootstrap, immutable historical `--at` reads, explicit `--against`
+comparisons, and governed Git branch/commit/pull-request automation remain
+separate follow-on work.
 
 ## Documentation
 
