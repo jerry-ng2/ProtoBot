@@ -16,10 +16,12 @@
 
 ## Rules for creating or modifying sibling entries
 
+A governed scope defines a domain of applicability, while a list
+or governed collection defines the sibling set within that domain.
 When creating or modifying any numbered rule in `AGENTS.md`, any
 specification document under `docs/`, any skill file under
-`.agents/skills/`, or any future governed scope added later, agents
-must follow these rules:
+`.agents/skills/`, or an entry in any future governed scope added
+later, agents must follow these rules:
 
 1. **Read all sibling entries first.** Before drafting or
    revising an entry, read every other entry in the same list
