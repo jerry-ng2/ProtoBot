@@ -1,7 +1,6 @@
 ---
 base: "https://raw.githubusercontent.com/fullsend-ai/agents/v0.43.0/harness/triage.yaml#sha256=3aa32e9f66ad6a9b60a75f50d3adc6ae39ebfb425c3928381e019436498bf2aa"
 
-# Let Fullsend apply its default for triage auto-code.
-# env:
-#     runner:
-#         TRIAGE_AUTO_CODE: "off"
+env:
+    runner:
+        TRIAGE_AUTO_CODE: "on"
