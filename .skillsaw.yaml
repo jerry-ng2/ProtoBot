@@ -1,5 +1,11 @@
 ---
 version: "0.20.0"
+# This list extends content-* rules to extra files; it does not
+# restrict which files the skillsaw pre-commit hook scans. The hook
+# lints the whole repository (pass_filenames: false by default).
+# .skillsaw-baseline.json — not content-paths — is the source of
+# truth for whether a given file or pattern is already exempted
+# from a rule.
 content-paths:
   - "docs/vision.md"
   - "docs/architecture.md"
