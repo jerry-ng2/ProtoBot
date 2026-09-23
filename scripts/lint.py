@@ -504,7 +504,7 @@ _REGISTRY: dict[str, dict[str, Any]] = {
                 "cmd": "python3",
                 "fixed_args": ["scripts/check_spec_hierarchy.py"],
                 "pass_filenames": False,
-                "default_files": (r"^(AGENTS\.md|\.fullsend/harness/review\.yaml)$"),
+                "default_files": r"^(AGENTS\.md|\.fullsend/harness/review\.yaml)$",
             },
         },
     },
