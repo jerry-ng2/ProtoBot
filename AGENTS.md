@@ -14,6 +14,27 @@
   that directory so Claude Code finds the same skills; do not add skills
   under `.claude/` directly.
 
+## Rules for creating or modifying AGENTS.md numbered lists
+
+When creating or modifying any numbered rule in `AGENTS.md`,
+agents must follow these rules:
+
+1. **Read all sibling rules in that same list first.** Before
+   drafting or revising a numbered rule, read every other rule
+   in the same list. Terminology consistency cannot be verified
+   without knowing what the sibling rules say.
+
+2. **Reuse established terminology.** Match the sibling rules'
+   terms for the same concepts. An undeclared alias for a term
+   already used in the same list is a defect.
+
+3. **Review agents must check sibling-rule terminology.** When
+   reviewing a PR that creates or modifies a numbered rule in
+   `AGENTS.md`, verify that the new or changed rule reuses
+   established sibling terminology rather than inventing an
+   alias. Findings should include terminology drift within the
+   same list, not only cross-document keyword checks.
+
 ## Specification document hierarchy
 
 Every Markdown file under `docs/` is a governed hierarchy member,
