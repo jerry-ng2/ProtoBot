@@ -109,7 +109,6 @@ jq -e \
    | if $item.number != $expectedIssueNumber
        or $item.repository_owner != $repoOwner
        or $item.repository_name != $repoName
-       or $item.parent != null
        or $item.status != $expectedStatus
        or $item.status_option_id != $expectedStatusOptionId
        or $item.state != $expectedState
