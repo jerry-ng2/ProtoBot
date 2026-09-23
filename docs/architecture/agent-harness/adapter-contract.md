@@ -641,7 +641,8 @@ document names them, and guard rules 5 and 6 treat them as reads.
    the Drafting Table role, refuses a write under `.protobot/` in every
    role, and names the failure. Other writes outside the role are
    allowed, because the harness layer is optional and the later layers
-   still hold ([What the harness layer stops][layer-stops]).
+   still hold ([What the harness layer stops][layer-stops]); the
+   file-source exception is documented there.
 3. **Guarded paths, every role.** A file write under `.protobot/`, to
    a registered artifact path, or below a store is refused. Paths are
    compared after symlink resolution, for reads and writes alike, a
@@ -657,7 +658,10 @@ document names them, and guard rules 5 and 6 treat them as reads.
    transition among them, and every tool of any other server is
    refused. The WMS boundary rejects such a transition in any case
    ([Validation Rules](../validation-rules.md), case VR-006), so this
-   rule is the early copy of that refusal.
+   rule is the early copy of that refusal. `scm branch_init` is the only
+   route for cutting the initialization branch, and its contract permits
+   it only while `.protobot/` is absent at the working-tree root
+   ([SCM `branch_init` precondition](../source-control-manager.md#branch_init)).
 5. **The role's tool set.** Under the Drafting Table role, the guard
    refuses every file write, subagent launch, web fetch, and web search,
    every read under `.protobot/` other than `project.yaml`, every read
@@ -669,21 +673,20 @@ document names them, and guard rules 5 and 6 treat them as reads.
    outside-the-project refusal is what keeps the `gh` store and the
    harness's own credential file out of reach.
 6. **The role's shell commands.** Under the Drafting Table role, the
-    guard first recognizes the initialization-branch shape for its
-    lifetime check:
-    `git switch -c <prefix>00001-project-init <default>`. If
-    `.protobot/` already exists, it refuses that form before applying the
-    generic shell-operation check. If `.protobot/` is absent, it falls
-    through to that check: raw Git remains outside the allowed shell
-    operations. For every other command, a command that is neither one of
-    the [shell operations](#shell-operations) in its exact form nor a read
-    form of the harness's [vocabulary row](#tool-vocabulary) is refused.
-    The guard reads the current branch with `git rev-parse`, the project
-    fields from `project.yaml`, and the change sets through `ears-manager`,
-    and refuses a registration whose `<nnnnn>` is not the change set of
-    `<branch>`. The only initialization route is `scm branch_init` while
-    `.protobot/` is absent, as rule 1 and the Source Control Manager
-    contract require.
+   guard first recognizes the initialization-branch shape for its
+   lifetime check:
+   `git switch -c <prefix>00001-project-init <default>`. If
+   `.protobot/` already exists, it refuses that form with the reason
+   `Project already initialized` before applying the generic
+   shell-operation check. If `.protobot/` is absent, it falls through to
+   that check: raw Git remains outside the allowed shell operations. A
+   command that is neither one of the [shell operations](#shell-operations)
+   in its exact form nor a read form of the harness's
+   [vocabulary row](#tool-vocabulary) is refused. The guard reads the
+   current branch with `git rev-parse --abbrev-ref HEAD`, the project
+   fields from `project.yaml`, and the change sets through `ears-manager`,
+   and refuses a registration whose `<nnnnn>` is not the change set of
+   `<branch>`.
 7. **Other roles' shell commands.** A command whose output redirection
    targets a guarded path written from the project root, such as
    `> docs/vision.md`, is refused. A path in any other position is not
@@ -766,8 +769,9 @@ The harness layer is the optional early layer of the
 [Governed tool integrations](../../architecture.md#governed-tool-integrations).
 The mandatory layers stay where #34 puts them
 ([Ungoverned-edit detection](../git-integration.md#ungoverned-edit-detection)),
-so a harness whose binding is weaker changes how early a violation is
-caught, never whether it is caught.
+so a harness whose binding is weaker normally changes how early a
+violation is caught, never whether it is caught. The exception is
+`ears-manager` file-source arguments, described below.
 
 | Write route to a guarded path | Drafting Table role | Every other role | Caught later by |
 | --- | --- | --- | --- |
@@ -785,7 +789,26 @@ routes forward from [The pre-stage digest comparison][pre-stage].
 
 A user can also switch the harness layer off, by editing a binding or
 starting the harness without hooks. The later layers do not depend on
-any harness.
+any harness for the routes in the table; the file-source exception below
+still requires value-level enforcement.
+
+### File-source arguments
+
+`--content-file` and `--impact-file` are caller-owned read sources, not
+project destinations. #30 permits regular-file sources outside the project
+root as well as `-` for standard input
+([CLI file inputs](../ears-manager-cli.md)). Their contents can therefore
+be copied into authoritative specification state without changing the
+destination path: an artifact for `--content-file`, or the change-set
+impact record for `--impact-file`. The later integrity and CI checks do
+not establish that the bytes came from standard input rather than an
+external source.
+
+Every binding must reject non-`-` values for these options with the shared
+guard or an equivalent native value-level restriction. If neither is
+available, calls using either file-source option must be refused. This
+exception applies across harnesses; it does not make the guard a
+prerequisite for the rest of the governed shell path.
 
 ---
 
@@ -986,7 +1009,9 @@ written records.
 A harness can host the Drafting Table when its binding meets these
 obligations. **Required** obligations make the binding usable at all.
 **Enforcement** obligations form the early layer: a binding that cannot
-meet one records the gap, and the later layers still hold.
+meet one records the gap, and the later layers still hold except for the
+file-source arguments described under
+[File-source arguments](#file-source-arguments).
 
 | # | Obligation | Kind | Shared by the core | Added by the binding | Fixture |
 | --- | --- | --- | --- | --- | --- |
@@ -1216,7 +1241,7 @@ negative checks of the [SCM's fixture][scm-fixture]:
 | Drafting Table | `source-control-manager publish` | Not a shell operation: the role reaches the SCM only through the `scm` tools |
 | Drafting Table | An `scm` tool that the manifest does not list | Not a Drafting Table operation |
 | Drafting Table | `register-approved-change-set --change-set CS-00004` | Not the change set of the current branch |
-| Drafting Table | `git switch -c cs/00001-project-init main`, in an initialized fixture clone | Initialization branch form refused before the generic non-shell-operation refusal because `.protobot/` already exists |
+| Drafting Table | `git switch -c cs/00001-project-init main`, in an initialized fixture clone | `Project already initialized` |
 | Drafting Table | `ears-manager --output json artifact put --change-set CS-00003 --id vision --kind vision --path docs/vision.md --owner <owner> --content-file ~/.netrc` | `--content-file` with a path |
 | Drafting Table | A `wms` tool that the manifest does not list, such as a lifecycle transition | Not a Drafting Table operation |
 | Drafting Table | `ears-manager --output json requirement add --change-set CS-00003 ... --text "$GH_TOKEN" ...` | Variable expansion |

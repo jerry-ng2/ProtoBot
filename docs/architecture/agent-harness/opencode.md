@@ -214,11 +214,9 @@ reaches them only through the `scm` tools. The guard enforces the same
 operations with the project's real values and the current branch. The
 native copy refuses early for constraints its patterns can express;
 the guard supplies the state and argument-value checks. OpenCode's
-simple wildcard matcher cannot express the constraint that
-`--content-file` and `--impact-file` may be followed only by `-` while
-also allowing the safe standard-input form. The native rule therefore
-does not provide defense in depth for those two values; the shared guard
-is the sole enforcement and must refuse every other value.
+native rules do not implement a value-level restriction for
+`--content-file` and `--impact-file`, so the shared guard must refuse
+non-`-` values for these options.
 
 ```yaml
 bash:
@@ -236,9 +234,12 @@ A pattern without `*` matches only that exact command. A pattern with
 that #30's grammar does not show, and a registration whose change set
 is not the current branch's. In particular, the native
 `"ears-manager *": allow` rule must not be treated as permission to pass
-`--content-file <path>` or `--impact-file <path>`; those restrictions rely on
-the guard's argument-level parsing. If the guard plugin is unavailable,
-the binding cannot safely run the governed shell path.
+non-`-` values to `--content-file` or `--impact-file`; the binding does
+not implement a native value-level restriction for these options. Under
+the shared [file-source exception](adapter-contract.md#file-source-arguments),
+if the guard plugin is unavailable, OpenCode must refuse calls using
+either option. Other governed shell operations do not depend on the guard
+being available.
 
 OpenCode matches these patterns against the whole command text,
 here-document bodies included, but does not look inside an output
