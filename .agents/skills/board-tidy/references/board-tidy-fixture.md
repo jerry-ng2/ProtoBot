@@ -110,11 +110,11 @@ stale-status row. 201 is `excluded_cross_repository`. 202 is
 
 ## Evidence before merge
 
-Before merging a change to eligibility, filtering, or stale-status
-logic, include the dry-run before/after for `move_to_ready` and
-`stale_statuses` against this fixture, or the live Step 5 proposal,
-in the description of the change. Lint checks alone do not satisfy
-this requirement.
+Before merging a change to Step 3 eligibility, Step 4 stale-status
+rules, or the Step 2 `items` shape those rules consume, include the
+dry-run before/after for `move_to_ready` and `stale_statuses` against
+this fixture, or the live Step 5 proposal, in the description of the
+change. Lint checks alone do not satisfy this requirement.
 
 Review agents must treat a missing dry-run or fixture before/after as
 a finding when the diff changes eligibility or stale-status logic.
