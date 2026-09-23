@@ -178,8 +178,11 @@ MCP.
 - Any coding-agent harness can host the TUI Drafting Table through a
   harness binding. The shared adapter core — a manifest, the Drafting
   Table role, the permitted shell operations, and one guard command
-  that every harness calls before each tool call — is defined in
+  that bindings wire into the pre-tool-call path as an optional early
+  layer — is defined in
   [Agent Harness Adapter Contract](agent-harness/adapter-contract.md).
+  Each binding records its per-call hook failure behavior; a hook that
+  does not run can leave guard-only checks unenforced.
   The first bindings are [OpenCode](agent-harness/opencode.md),
   [Claude Code](agent-harness/claude-code.md), and
   [Codex](agent-harness/codex.md).

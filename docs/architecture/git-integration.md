@@ -809,11 +809,15 @@ no ref, path, remote, or message from the agent, except the checked
 prefix and default branch at initialization and an optional commit
 body, and derives every target from the change set ([Mapping to #34's
 permitted operations][scm-mapping]).
-The agent runs no Git or Git host command itself: the guard refuses
-them in the role's shell, where only `ears-manager`, the clock, and
-registration remain
+The role is designed to run no Git or Git host command itself: on calls
+it checks, the guard refuses them in the role's shell, where only
+`ears-manager`, the clock, and registration remain
 ([Shell operations](agent-harness/adapter-contract.md#shell-operations)).
-The later layers hold when the harness layer is off.
+The SCM enforces its operation rules when called through its tools;
+branch protection and CI continue to gate merges even if the harness
+layer is off. They do not intercept direct shell `git` or `gh` calls
+that an absent guard and permissive native rules let through
+([What the harness layer stops][layer-stops]).
 
 ### Allowed
 
@@ -1045,3 +1049,5 @@ resurface.
 [projections]: components.md#worker-repository-projections-decided
 [scm-fixture]: source-control-manager.md#repository-fixture-against-the-scm
 [scm-mapping]: source-control-manager.md#mapping-to-34s-permitted-operations
+
+[layer-stops]: agent-harness/adapter-contract.md#what-the-harness-layer-stops

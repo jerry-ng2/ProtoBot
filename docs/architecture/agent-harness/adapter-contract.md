@@ -559,8 +559,11 @@ performs them:
 
 `drafting-table-guard` is the only adapter code shared by every harness.
 It is one executable with no runtime dependency, like `ears-manager`.
-Every binding calls it before each tool call, and it answers allow or
-refuse.
+Each binding wires it into the tool-call path. Guard availability is a
+per-call fact: a hook or plugin being installed, trusted, or passing a
+startup probe does not prove that the guard returned a decision for a
+particular call. Each binding documents whether its harness blocks or
+passes a call when that invocation fails or does not run.
 
 #### Guard input and output
 
@@ -640,9 +643,10 @@ document names them, and guard rules 5 and 6 treat them as reads.
    either read fails, it refuses every file write and every shell command in
    the Drafting Table role, refuses a write under `.protobot/` in every
    role, and names the failure. Other writes outside the role are
-   allowed, because the harness layer is optional and the later layers
-   still hold ([What the harness layer stops][layer-stops]); the
-   file-source exception is documented there.
+   allowed, because the harness layer is optional. Unauthorized
+   persistent edits to registered paths remain subject to downstream
+   checks ([What the harness layer stops][layer-stops]); those checks
+   cannot establish the source of an `ears-manager` file-source input.
 3. **Guarded paths, every role.** A file write under `.protobot/`, to
    a registered artifact path, or below a store is refused. Paths are
    compared after symlink resolution, for reads and writes alike, a
@@ -758,7 +762,7 @@ sequenceDiagram
     DT->>EM: requirement add
     User->>DT: Commit and open a pull request
     DT->>SCM: commit, publish
-    Note over H,G: The harness calls the guard before every tool call
+    Note over H,G: The binding invokes the guard on its hook path; failure behavior is harness-specific
 ```
 
 ---
@@ -769,17 +773,29 @@ The harness layer is the optional early layer of the
 [Governed tool integrations](../../architecture.md#governed-tool-integrations).
 The mandatory layers stay where #34 puts them
 ([Ungoverned-edit detection](../git-integration.md#ungoverned-edit-detection)),
-so a harness whose binding is weaker normally changes how early a
-violation is caught, never whether it is caught. The exception is
-`ears-manager` file-source arguments, described below.
+so a harness whose binding is weaker normally changes how early an
+unauthorized persistent edit to a registered path is caught, not whether
+that edit is caught when it reaches the SCM or CI checks. Those later
+layers do not replace the guard's command parser, option/value checks,
+read restrictions, or shell-syntax restrictions. A call that reaches an
+allowed shell tool without a guard decision can therefore bypass any
+guard-only check, including variable-expansion and redirection checks;
+the later layers check persistent state, not the command or its inputs.
+The file-source provenance gap is described below.
 
-| Write route to a guarded path | Drafting Table role | Every other role | Caught later by |
+The guard entries below describe calls on which the guard runs. A
+binding's hook or plugin being installed does not by itself prove that it
+made a decision for a particular call; the failure cases are binding-
+specific and are not refusals.
+
+| Route to guarded state | Drafting Table role | Every other role | Caught later by |
 | --- | --- | --- | --- |
-| File-writing tool | Refused by the guard; hidden by native rules where the harness can hide tools | Refused by the guard | Pre-stage digest comparison, `ears-manager check`, CI path ownership |
-| Shell writer, such as `sed -i`, `cp`, or `tee` | Refused by the guard | Not stopped | Same |
-| Output redirection in a shell command | Refused by the guard | Refused by the guard when the redirection target is written from the project root | Same |
-| Tool of a non-governed MCP server | Refused by the guard | The user's own configuration | Same |
-| Subagent | Refused by the guard | Not applicable | Same |
+| File-writing tool | Refused by the guard; hidden by native rules where the harness can hide tools | Refused by the guard | Pre-stage digest comparison, `ears-manager check`, CI path ownership, for persistent edits to registered paths |
+| Shell writer, such as `sed -i`, `cp`, or `tee` | Refused by the guard | Not stopped | Same, for persistent edits to registered paths |
+| Output redirection in a shell command | Refused by the guard | Refused by the guard when the redirection target is written from the project root | Same, for persistent edits to registered paths |
+| `ears-manager --content-file` or `--impact-file` with a value other than `-` | Refused when the guard runs; binding-specific hook failures may pass the call through | Same | None: integrity and CI cannot establish whether the bytes came from standard input or an external file |
+| Tool of a non-governed MCP server | Refused by the guard | The user's own configuration | No tool-call check; only unauthorized persistent edits to registered paths are caught if they reach SCM or CI |
+| Subagent | Refused by the guard | Not applicable | No launch check; only unauthorized persistent edits to registered paths are caught if they reach SCM or CI |
 
 A route marked "not stopped" is real. An agent outside the role can
 still change a registered file through its shell, for example after
@@ -788,9 +804,16 @@ still change a registered file through its shell, for example after
 routes forward from [The pre-stage digest comparison][pre-stage].
 
 A user can also switch the harness layer off, by editing a binding or
-starting the harness without hooks. The later layers do not depend on
-any harness for the routes in the table; the file-source exception below
-still requires value-level enforcement.
+starting the harness without hooks. Unauthorized persistent edits to
+registered paths remain subject to the SCM's pre-stage checks and the
+repository's `ears-manager check` and CI path-ownership checks. This does
+not make the rest of the shell path safe without the guard: those later
+checks do not enforce its command grammar, shell-syntax, read, or
+argument-value rules. File-source values are one concrete example: their
+restriction is only enforced when the guard runs or a binding has an
+equivalent native value-level rule. A hook that fails open can let the
+CLI read a non-`-` source, and no later layer detects that provenance
+loss.
 
 ### File-source arguments
 
@@ -804,11 +827,29 @@ impact record for `--impact-file`. The later integrity and CI checks do
 not establish that the bytes came from standard input rather than an
 external source.
 
-Every binding must reject non-`-` values for these options with the shared
-guard or an equivalent native value-level restriction. If neither is
-available, calls using either file-source option must be refused. This
-exception applies across harnesses; it does not make the guard a
-prerequisite for the rest of the governed shell path.
+On every call for which it returns a decision, the shared guard rejects
+non-`-` values for these options. A binding may provide the same check as a
+native value-level restriction. The check is per call, not per process or
+session: an installed hook, a passing startup probe, or an available guard
+binary is not sufficient evidence that a particular invocation was
+checked.
+
+The shared refusal guarantee has an explicit fail-open exception where a
+harness may run the tool without a guard decision. In that case the native
+rules may still admit the shell command, `ears-manager` may read the
+external source, and the later integrity and CI layers do not catch it.
+These are binding gaps, not protected behavior or successful H8
+enforcement:
+
+| Binding | Guard-unavailable case | Consequence for a file-source call |
+| --- | --- | --- |
+| [OpenCode](opencode.md) | The plugin is absent or no hook is registered; native Bash permissions have no plugin-presence check | The `ears-manager *` allow rule still admits the command, including non-`-` file-source values, `--text "$GH_TOKEN"`, output redirection, and other shell syntax that only the guard rejects |
+| [Claude Code](claude-code.md) | The hook times out, is killed, or its shim cannot run | No status 2 is returned, so the call may proceed with a non-`-` value |
+| [Codex](codex.md) | The hook is untrusted outside the launcher, crashes, exits other than 2, or times out | The call may proceed with a non-`-` value; the sandbox does not establish the source of bytes read into governed state |
+
+The binding status and fixture must keep these failure modes visible. A
+call with no guard decision is not a refusal, and a fixture that exercises
+only the successful hook path does not establish fail-closed behavior.
 
 ---
 
@@ -1009,9 +1050,10 @@ written records.
 A harness can host the Drafting Table when its binding meets these
 obligations. **Required** obligations make the binding usable at all.
 **Enforcement** obligations form the early layer: a binding that cannot
-meet one records the gap, and the later layers still hold except for the
-file-source arguments described under
-[File-source arguments](#file-source-arguments).
+meet one records the gap. Later layers check unauthorized persistent
+edits to registered paths when they reach the SCM or CI, but cannot
+establish file-source provenance when a hook fails open, as described
+under [File-source arguments](#file-source-arguments).
 
 | # | Obligation | Kind | Shared by the core | Added by the binding | Fixture |
 | --- | --- | --- | --- | --- | --- |
@@ -1022,7 +1064,7 @@ file-source arguments described under
 | H5 | Do nothing when a session is idle or ends | Required | The guard has no exit action | No exit hook | 10 |
 | H6 | Keep a replayable session record with the facts in [Traces](#traces) | Required | The facts | The record and its export route | 15 |
 | H7 | Run headless with replayed model turns and no permission prompt | Required | The fixture steps | A replay mechanism and a headless command | All |
-| H8 | Call the guard before every tool call, with the harness name and the role | Enforcement | The guard | A hook, a plugin, or a shim | 6, 7, 14, vectors |
+| H8 | Invoke the guard on each tool call and enforce its decision; document any per-call fail-open path | Enforcement | The guard | A hook, a plugin, or a shim, with harness-specific failure behavior | 6, 7, 14, vectors |
 | H9 | Hide file-writing, subagent, and web tools from the role | Enforcement | Guard rule 5 refuses them anyway | Native tool rules | 6 |
 | H10 | Offer the role's model only Toolkit skills in its skill list, and let the role load only those | Enforcement | `toolkit_skills`, guard rule 5 refuses a load | Native rules that hide and refuse every other skill | 3, 4 |
 | H11 | Hold no credential in binding files, and turn off session upload | Enforcement | — | Binding config | Vectors, harness checks |
@@ -1226,7 +1268,10 @@ A session started in one bound harness and resumed in another, at step
 ### Guard vectors
 
 Each vector runs against the guard directly and through the binding's
-hook, and must be refused before it runs. Unless a row says otherwise,
+normal, active hook path, and must be refused before it runs. Hook-
+unavailable cases are recorded separately as explicit gaps below; a call
+that passes through without a guard decision is not a successful refusal.
+Unless a row says otherwise,
 `cs/00003-<slug>` is checked out. The SCM's own refusals, such as a
 force push, another repository, or a push to the default branch, are
 negative checks of the [SCM's fixture][scm-fixture]:
