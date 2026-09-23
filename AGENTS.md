@@ -158,20 +158,24 @@ agents must follow these rules:
 
 3. **Link a GitHub issue or justify why none is needed.**
    When a change reverses or corrects a documented business
-   rule in a skill file, link a GitHub issue that describes
-   the incorrect prior behavior and its impact, or include
-   an explicit justification in the PR description for why
-   no issue is needed. For example, a change verified live
-   against production data in a single session may omit a
-   linked issue. Absence of both is a defect.
+   rule in a skill file, link a GitHub issue describing
+   incorrect prior behavior and its impact, or include an
+   explicit justification in the PR description for why no
+   issue is needed. A documented business rule governs when
+   a skill acts or what conditions gate decisions (e.g.,
+   altering eligibility for status moves). Reversals change
+   these criteria; bugfixes, orchestration tweaks, and
+   non-behavioral edits do not. For example, single-session
+   live verification against production data may justify
+   omitting an issue. Absence of both is a defect.
 
 4. **Review agents must check for a linked issue or
    justification.** When reviewing a PR that creates or
-   modifies a skill file, verify that a change that reverses
-   or corrects a documented business rule either links a
-   GitHub issue describing the incorrect prior behavior and
-   its impact, or includes an explicit justification in the
-   PR description for why no issue is needed. Findings should
+   modifies a skill file, verify that a change reversing or
+   correcting a documented business rule either links a
+   GitHub issue describing incorrect prior behavior and its
+   impact, or includes an explicit justification in the PR
+   description for why no issue is needed. Findings should
    include the absence of both, not only formatting and
    specification-hierarchy checks.
 
