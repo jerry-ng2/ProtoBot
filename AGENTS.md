@@ -14,26 +14,48 @@
   that directory so Claude Code finds the same skills; do not add skills
   under `.claude/` directly.
 
-## Rules for creating or modifying AGENTS.md numbered lists
+## Rules for creating or modifying sibling entries
 
-When creating or modifying any numbered rule in `AGENTS.md`,
-agents must follow these rules:
+When creating or modifying any numbered rule in `AGENTS.md`, any
+specification document under `docs/`, any skill file under
+`.agents/skills/`, or any future surface added later, agents
+must follow these rules:
 
-1. **Read all sibling rules in that same list first.** Before
-   drafting or revising a numbered rule, read every other rule
-   in the same list. Terminology consistency cannot be verified
-   without knowing what the sibling rules say.
+1. **Read all sibling entries first.** Before drafting or
+   revising an entry, read every other entry on the same
+   surface. Consistency cannot be verified without knowing
+   what the sibling entries say.
 
-2. **Reuse established terminology.** Match the sibling rules'
-   terms for the same concepts. An undeclared alias for a term
-   already used in the same list is a defect.
+2. **Reuse established terminology.** Match the sibling
+   entries' terms for the same concepts. An undeclared alias
+   for a term already used on the same surface is a defect.
 
-3. **Review agents must check sibling-rule terminology.** When
-   reviewing a PR that creates or modifies a numbered rule in
-   `AGENTS.md`, verify that the new or changed rule reuses
+3. **Review agents must check sibling-entry terminology.**
+   When reviewing a PR that creates or modifies an entry on
+   a surface, verify that the new or changed entry reuses
    established sibling terminology rather than inventing an
-   alias. Findings should include terminology drift within the
-   same list, not only cross-document keyword checks.
+   alias. Findings should include terminology drift within
+   the same surface, not only cross-document keyword checks.
+
+Examples of sibling entries on each surface listed above:
+
+- **Numbered rules in `AGENTS.md`:** the other numbered
+  rules in that same list.
+- **Specification documents under `docs/`:** every other
+  governed Markdown document under `docs/`.
+- **Skill files under `.agents/skills/`:** every other
+  skill file under `.agents/skills/`. Follow the formatting
+  conventions observed in sibling files. Match
+  backtick-quoting of refs, command syntax style, and
+  structural patterns used by sibling skills. For example,
+  quote git refs as `` `upstream/main` `` rather than
+  leaving them unquoted. Inconsistent formatting with
+  sibling skills is a defect. Match structural formatting
+  conventions, not behavioral fields. Behavioral fields
+  like dispatch parameters must be determined by the
+  skill's own requirements, not copied from siblings.
+  Blindly copying behavioral configuration from a sibling
+  can produce incorrect dispatch or workflow behavior.
 
 ## Specification document hierarchy
 
@@ -79,13 +101,7 @@ membership undecided.
 When creating or modifying any document under `docs/`, agents
 must follow these rules:
 
-1. **Read all sibling specification documents first.** Before
-   writing or revising a specification document, read every
-   other governed Markdown document under `docs/`. Cross-document
-   consistency cannot be verified without knowing what the
-   sibling documents say.
-
-2. **Account for all components, interfaces, and constraints.**
+1. **Account for all components, interfaces, and constraints.**
    New or revised specification documents must account for
    every component, interface, and constraint enumerated in
    `docs/architecture/components.md` and
@@ -94,7 +110,7 @@ must follow these rules:
    document's scope, it must be addressed — not silently
    omitted.
 
-3. **Verify deployment topology, security posture, and
+2. **Verify deployment topology, security posture, and
    persistent state coverage.** Cross-check the document
    against `docs/architecture/overview.md` and
    `docs/architecture.md` to confirm that deployment topology
@@ -103,7 +119,7 @@ must follow these rules:
    state (all stores enumerated in the Architecture) are
    covered where relevant.
 
-4. **Review agents must check cross-document coverage.** When
+3. **Review agents must check cross-document coverage.** When
    reviewing a PR that creates or modifies a specification
    document, verify that the document accounts for components,
    interfaces, and constraints from `components.md` and
@@ -118,7 +134,7 @@ must follow these rules:
    ProtoBot keywords and relationship terms; an undeclared
    alias for a defined keyword is a defect.
 
-5. **Review agents must also check for staleness introduced
+4. **Review agents must also check for staleness introduced
    elsewhere.** When a PR changes a contract, lifecycle, or
    behavior description in a specification document, search
    all other governed Markdown documents under `docs/` — not
@@ -127,30 +143,6 @@ must follow these rules:
    updated to match.
 
 ## Agent skills
-
-### Rules for creating or modifying skill files
-
-When creating or modifying any skill file under `.agents/skills/`,
-agents must follow these rules:
-
-1. **Read all sibling skill files first.** Before writing or
-   revising a skill file, read every other skill file under
-   `.agents/skills/`. Cross-skill consistency cannot be verified
-   without knowing what the sibling skills say.
-
-2. **Follow the formatting conventions observed in sibling files.**
-   Match backtick-quoting of refs, command syntax style, and
-   structural patterns used by sibling skills. For example, quote
-   git refs as `` `upstream/main` `` rather than leaving them
-   unquoted. Inconsistent formatting with sibling skills is a
-   defect.
-
-3. **Match structural conventions, not behavioral fields.**
-   Structural formatting conventions should be matched to siblings,
-   but behavioral fields like dispatch parameters must be determined
-   by the skill's own requirements, not copied from siblings.
-   Blindly copying behavioral configuration from a sibling can
-   produce incorrect dispatch or workflow behavior.
 
 ### Aligning skills with the specification hierarchy
 
