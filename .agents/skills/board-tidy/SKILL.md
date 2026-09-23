@@ -136,7 +136,6 @@ Filter the `items` array for entries meeting all of these criteria:
 
 - Current status is **Backlog**.
 - `open_blocker_count == 0` and `blockers_complete == true`.
-- `parent == null`; sub-issues inherit status from their parent.
 - In `active` milestone mode, `milestone_number` is present in the open
   milestone set from Step 1 and `milestone_state == "OPEN"`.
 - In `none` milestone mode, `milestone_number == null`.
@@ -144,21 +143,26 @@ Filter the `items` array for entries meeting all of these criteria:
 - `author_login` is known and is not `renovate[bot]`; exclude the exact title
   **Renovate Dependency Dashboard**.
 
+Sub-issues are the unit of work: a sub-issue is eligible on its own merits,
+and its parent's status is not considered.
+
 ## Step 4: Identify stale statuses
 
 Flag items where the board status does not match reality. Apply these rules in
 order:
 
-- Exclude every item with `parent != null` from stale-status suggestions and
-  mutations; sub-issues inherit their board status from the parent.
-- For an open parent item with `blockers_complete == false`, report that
+- Sub-issues are the unit of work: apply the stale-status rules to every
+  item, including sub-issues, on its own merits. A parent's status does not
+  exempt a sub-issue, and a sub-issue's status does not make its parent
+  stale.
+- For an open item with `blockers_complete == false`, report that
   blocker data is incomplete and make no blocker-based recommendation.
-- For a closed parent item whose status is not **Done**, suggest **Done**.
+- For a closed item whose status is not **Done**, suggest **Done**.
   Closed-state handling takes precedence over every blocker rule.
-- For an open parent item with status **In progress**,
+- For an open item with status **In progress**,
   `open_blocker_count > 0`, `blockers_complete == true`, and every returned
   blocker open, flag it for review rather than changing it automatically.
-- For an open parent item with status **Ready** and `open_blocker_count > 0`,
+- For an open item with status **Ready** and `open_blocker_count > 0`,
   suggest **Backlog**.
 
 ## Step 5: Confirm with the user
