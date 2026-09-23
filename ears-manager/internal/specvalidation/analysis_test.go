@@ -164,3 +164,72 @@ func TestChangeSetAssessmentStatusCompleteIncompleteAndStale(t *testing.T) {
 		t.Fatalf("stale mechanical status = %q", got)
 	}
 }
+
+func TestCompareChangeSetOverlappingCycles(t *testing.T) {
+	// Diamond-plus-back-edge overlapping cycle structure:
+	// A -> B -> C -> A
+	// A -> D -> C -> A
+	// If only D is changed in the proposal, cycle 2 must still be found even though
+	// vertex C is shared with cycle 1.
+	reqA := validRequirement("REQ-CYC-A", records.EARSUbiquitous, "Requirement A")
+	reqB := validRequirement("REQ-CYC-B", records.EARSUbiquitous, "Requirement B")
+	reqC := validRequirement("REQ-CYC-C", records.EARSUbiquitous, "Requirement C")
+	reqD := validRequirement("REQ-CYC-D", records.EARSUbiquitous, "Requirement D")
+
+	reqA.Relationships = []records.Relationship{
+		{Type: relationshipDependsOn, Target: reqB.ID},
+		{Type: relationshipDependsOn, Target: reqD.ID},
+	}
+	reqB.Relationships = []records.Relationship{
+		{Type: relationshipDependsOn, Target: reqC.ID},
+	}
+	reqD.Relationships = []records.Relationship{
+		{Type: relationshipDependsOn, Target: reqC.ID},
+	}
+	reqC.Relationships = []records.Relationship{
+		{Type: relationshipDependsOn, Target: reqA.ID},
+	}
+
+	snapshot := Snapshot{
+		Requirements: []Document[records.Requirement]{
+			{Value: reqA}, {Value: reqB}, {Value: reqC}, {Value: reqD},
+		},
+	}
+
+	// Case 1: only D is changed
+	csOnlyD := records.ChangeSet{
+		ID:                     "CS-00010",
+		ImplementationRequired: true,
+		Operations: []records.RequirementOperation{
+			{Action: "revise", RequirementID: reqD.ID},
+		},
+	}
+	reportD := CompareChangeSet(csOnlyD, strings.Repeat("0", 40), snapshot)
+	if len(reportD.DependencyCycles) != 1 {
+		t.Fatalf("expected 1 cycle involving changed requirement D, got %d: %#v", len(reportD.DependencyCycles), reportD.DependencyCycles)
+	}
+	expectedCycleD := []string{reqA.ID, reqD.ID, reqC.ID, reqA.ID}
+	if !reflect.DeepEqual(reportD.DependencyCycles[0].Cycle, expectedCycleD) {
+		t.Fatalf("cycle for changed D = %#v, want %#v", reportD.DependencyCycles[0].Cycle, expectedCycleD)
+	}
+
+	// Case 2: both A and D are changed (both cycles should be included)
+	csBoth := records.ChangeSet{
+		ID:                     "CS-00011",
+		ImplementationRequired: true,
+		Operations: []records.RequirementOperation{
+			{Action: "revise", RequirementID: reqA.ID},
+			{Action: "revise", RequirementID: reqD.ID},
+		},
+	}
+	reportBoth := CompareChangeSet(csBoth, strings.Repeat("0", 40), snapshot)
+	if len(reportBoth.DependencyCycles) != 2 {
+		t.Fatalf("expected 2 overlapping cycles, got %d: %#v", len(reportBoth.DependencyCycles), reportBoth.DependencyCycles)
+	}
+	expectedCycle1 := []string{reqA.ID, reqB.ID, reqC.ID, reqA.ID}
+	expectedCycle2 := []string{reqA.ID, reqD.ID, reqC.ID, reqA.ID}
+	if !reflect.DeepEqual(reportBoth.DependencyCycles[0].Cycle, expectedCycle1) ||
+		!reflect.DeepEqual(reportBoth.DependencyCycles[1].Cycle, expectedCycle2) {
+		t.Fatalf("cycles = %#v, want %#v and %#v", reportBoth.DependencyCycles, expectedCycle1, expectedCycle2)
+	}
+}

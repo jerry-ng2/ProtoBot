@@ -194,6 +194,87 @@ func TestChangeSetUpdateRejectsInvalidImpactFile(t *testing.T) {
 	}
 }
 
+func TestChangeSetCompareRejectsAgainstOption(t *testing.T) {
+	root := newFixtureProject(t)
+	t.Chdir(root)
+	code, stdout, stderr := runCLI(nil, "--output", "json", "change-set", "create", "--intent", "Compare against test", "--implementation-required", "true", "--created", "2026-09-18T18:00:00Z")
+	assertSuccess(t, code, stdout, stderr)
+	changeSetID := jsonString(t, stdout, "data", "change_set", "id")
+
+	// Passing --against is refused with change_set.invalid_base
+	code, stdout, stderr = runCLI(nil, "--output", "json", "change-set", "compare", "--change-set", changeSetID, "--against", strings.Repeat("0", 40))
+	if code != 4 || !strings.Contains(stdout, "change_set.invalid_base") {
+		t.Fatalf("expected change_set.invalid_base when --against passed, got code %d stdout %s stderr %s", code, stdout, stderr)
+	}
+}
+
+func TestChangeSetCompareFailsOnUnreadableBaseCommit(t *testing.T) {
+	root := newFixtureProject(t)
+	t.Chdir(root)
+	code, stdout, stderr := runCLI(nil, "--output", "json", "change-set", "create", "--intent", "Missing base commit test", "--implementation-required", "true", "--created", "2026-09-18T18:00:00Z")
+	assertSuccess(t, code, stdout, stderr)
+	changeSetID := jsonString(t, stdout, "data", "change_set", "id")
+
+	// Corrupt the base_commit in the stored change set manifest to a non-existent commit
+	manifestPath := filepath.Join(root, ".protobot", "change-sets", strings.ToLower(changeSetID)+".yaml")
+	var cs records.ChangeSet
+	if err := storage.ReadFile(manifestPath, &cs); err != nil {
+		t.Fatal(err)
+	}
+	cs.BaseCommit = strings.Repeat("f", 40)
+	data, err := storage.Encode(cs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	refreshProjectDigests(t, root)
+
+	code, stdout, stderr = runCLI(nil, "--output", "json", "change-set", "compare", "--change-set", changeSetID)
+	if code != 4 || !strings.Contains(stdout, "change_set.invalid_base") {
+		t.Fatalf("expected change_set.invalid_base for unreadable base, got code %d stdout %s stderr %s", code, stdout, stderr)
+	}
+}
+
+func TestChangeSetUpdateFailsWithNotProposedWhenMissing(t *testing.T) {
+	root := newFixtureProject(t)
+	t.Chdir(root)
+	code, stdout, stderr := runCLI(nil, "--output", "json", "change-set", "update", "--change-set", "CS-99999", "--intent", "Nonexistent")
+	if code != 4 || !strings.Contains(stdout, "change_set.not_proposed") {
+		t.Fatalf("expected change_set.not_proposed for missing change-set, got code %d stdout %s stderr %s", code, stdout, stderr)
+	}
+}
+
+func TestChangeSetMutationFailsClosedWhenDefaultBranchRefMissing(t *testing.T) {
+	root := newFixtureProject(t)
+	t.Chdir(root)
+	code, stdout, stderr := runCLI(nil, "--output", "json", "change-set", "create", "--intent", "Unresolved default branch test", "--implementation-required", "true", "--created", "2026-09-18T18:00:00Z")
+	assertSuccess(t, code, stdout, stderr)
+	changeSetID := jsonString(t, stdout, "data", "change_set", "id")
+
+	// Set default_branch in project.yaml to a branch that does not exist in git
+	configPath := filepath.Join(root, ".protobot", "project.yaml")
+	var config records.ProjectConfig
+	if err := storage.ReadFile(configPath, &config); err != nil {
+		t.Fatal(err)
+	}
+	config.Repository.DefaultBranch = "nonexistent-branch"
+	data, err := storage.Encode(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Any mutation (e.g. change-set update) must fail closed rather than treating manifests as proposed
+	code, stdout, stderr = runCLI(nil, "--output", "json", "change-set", "update", "--change-set", changeSetID, "--intent", "Should fail closed")
+	if code == 0 || !strings.Contains(stdout, "project.default_branch_unresolved") {
+		t.Fatalf("expected failure when default branch is unresolved, got code %d stdout %s stderr %s", code, stdout, stderr)
+	}
+}
+
 func newAnalysisFixture(t *testing.T) string {
 	t.Helper()
 	root := newFixtureProject(t)

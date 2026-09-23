@@ -1,6 +1,7 @@
 package specvalidation
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -410,46 +411,81 @@ func findDirectedCycles(graph map[string][]string) [][]string {
 		vertices = append(vertices, vertex)
 	}
 	vertices = uniqueSortedStrings(vertices)
-	state := make(map[string]int, len(vertices))
-	stack := make([]string, 0, len(vertices))
+
+	indexOf := make(map[string]int, len(vertices))
+	for i, v := range vertices {
+		indexOf[v] = i
+	}
+
 	reported := make(map[string]bool)
 	cycles := make([][]string, 0)
-	var visit func(string)
-	visit = func(vertex string) {
-		state[vertex] = 1
-		stack = append(stack, vertex)
-		for _, target := range graph[vertex] {
-			if state[target] == 0 {
-				visit(target)
-				continue
-			}
-			if state[target] != 1 {
-				continue
-			}
-			start := 0
-			for index, item := range stack {
-				if item == target {
-					start = index
-					break
+
+	for startIndex, start := range vertices {
+		blocked := make(map[string]bool)
+		blockMap := make(map[string][]string)
+		stack := make([]string, 0)
+
+		var unblock func(string)
+		unblock = func(u string) {
+			blocked[u] = false
+			neighbors := blockMap[u]
+			delete(blockMap, u)
+			for _, w := range neighbors {
+				if blocked[w] {
+					unblock(w)
 				}
 			}
-			cycle := append(append([]string{}, stack[start:]...), target)
-			cycle = rotateCycle(cycle)
-			key := strings.Join(cycle, "->")
-			if reported[key] {
-				continue
+		}
+
+		var findCycles func(string) bool
+		findCycles = func(u string) bool {
+			foundCycle := false
+			stack = append(stack, u)
+			blocked[u] = true
+
+			for _, v := range graph[u] {
+				if indexOf[v] < startIndex {
+					continue
+				}
+				if v == start {
+					cycle := append(append([]string{}, stack...), start)
+					cycle = rotateCycle(cycle)
+					key := strings.Join(cycle, "->")
+					if !reported[key] {
+						reported[key] = true
+						cycles = append(cycles, cycle)
+					}
+					foundCycle = true
+				} else if !blocked[v] {
+					if findCycles(v) {
+						foundCycle = true
+					}
+				}
 			}
-			reported[key] = true
-			cycles = append(cycles, cycle)
+
+			if foundCycle {
+				unblock(u)
+			} else {
+				for _, v := range graph[u] {
+					if indexOf[v] < startIndex {
+						continue
+					}
+					if !slices.Contains(blockMap[v], u) {
+						blockMap[v] = append(blockMap[v], u)
+					}
+				}
+			}
+
+			stack = stack[:len(stack)-1]
+			return foundCycle
 		}
-		stack = stack[:len(stack)-1]
-		state[vertex] = 2
+
+		findCycles(start)
 	}
-	for _, vertex := range vertices {
-		if state[vertex] == 0 {
-			visit(vertex)
-		}
-	}
+
+	sort.Slice(cycles, func(i, j int) bool {
+		return strings.Join(cycles[i], "->") < strings.Join(cycles[j], "->")
+	})
 	return cycles
 }
 

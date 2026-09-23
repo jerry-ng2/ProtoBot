@@ -653,31 +653,6 @@ func hasRelationship(values []records.Relationship, relationshipType string) boo
 	})
 }
 
-func proposedChangeSet(state projectState, id string) (int, records.ChangeSet, *commandFailure) {
-	if err := records.ValidateChangeSetID(id); err != nil {
-		return -1, records.ChangeSet{}, invalidIDFailure("change_set.invalid_id", "Change-set", id)
-	}
-	index, value, exists := findChangeSet(state.snapshot, id)
-	if !exists {
-		return -1, records.ChangeSet{}, validationFailure("change_set.not_proposed", fmt.Sprintf("Change set %s was not found.", id), nil)
-	}
-	manifestPath := state.snapshot.ChangeSets[index].Path
-	if changeSetApprovedAt(state.root, state.snapshot.Config.Repository.DefaultBranch, manifestPath) {
-		return -1, records.ChangeSet{}, conflictFailure("change_set.not_proposed", fmt.Sprintf("Change set %s is approved and immutable.", id), nil)
-	}
-	if value.BaseCommit == "" {
-		return -1, records.ChangeSet{}, validationFailure("change_set.not_proposed", fmt.Sprintf("Change set %s has no base commit.", id), nil)
-	}
-	currentCommit, failure := currentCommit(state.root)
-	if failure != nil {
-		return -1, records.ChangeSet{}, failure
-	}
-	if !strings.EqualFold(currentCommit, value.BaseCommit) {
-		return -1, records.ChangeSet{}, conflictFailure("change_set.base_mismatch", fmt.Sprintf("Change set %s is based on %s, but the working tree is at %s.", id, value.BaseCommit, currentCommit), nil)
-	}
-	return index, cloneChangeSet(value), nil
-}
-
 func requirementOperation(changeSet *records.ChangeSet, action, id string) (records.RequirementOperation, *commandFailure) {
 	for index, operation := range changeSet.Operations {
 		if operation.RequirementID != id {
@@ -1076,81 +1051,30 @@ func artifactOperation(changeSet *records.ChangeSet, action, id string) (records
 	return operation, nil
 }
 
-func runChangeSetCreate(args []string) (any, Mutation, *commandFailure) {
-	parsed, failure := parseOptions(args, valueOptions("intent", "affected-interface", "affected-scope", "implementation-required", "implementation-rationale", "created"))
+func runImpact(args []string) (any, Mutation, *commandFailure) {
+	parsed, failure := parseOptions(args, valueOptions("change-set"))
 	if failure != nil {
 		return nil, Mutation{}, failure
 	}
-	intent, failure := requireOption(parsed, "intent")
+	id, failure := requireOption(parsed, "change-set")
 	if failure != nil {
 		return nil, Mutation{}, failure
 	}
-	implementationRequired, failure := parseBoolOption(parsed, "implementation-required")
-	if failure != nil {
-		return nil, Mutation{}, failure
-	}
-	created, failure := requireOption(parsed, "created")
-	if failure != nil {
-		return nil, Mutation{}, failure
-	}
-	if !implementationRequired && strings.TrimSpace(parsed.one("implementation-rationale")) == "" {
-		return nil, Mutation{}, usageFailure("option --implementation-rationale is required when implementation is false")
+	if err := records.ValidateChangeSetID(id); err != nil {
+		return nil, Mutation{}, invalidIDFailure("change_set.invalid_id", "Change-set", id)
 	}
 	state, failure := loadState()
 	if failure != nil {
 		return nil, Mutation{}, failure
 	}
-	baseCommit, failure := currentCommit(state.root)
-	if failure != nil {
-		return nil, Mutation{}, failure
+	_, value, exists := findChangeSet(state.snapshot, id)
+	if !exists {
+		return nil, Mutation{}, validationFailure("change_set.not_found", fmt.Sprintf("Change set %s was not found.", id), nil)
 	}
-	id, failure := nextChangeSetID(state.snapshot)
-	if failure != nil {
-		return nil, Mutation{}, failure
+	if strings.TrimSpace(value.BaseCommit) == "" || !commitExists(state.root, value.BaseCommit) {
+		return nil, Mutation{}, validationFailure("change_set.invalid_base", "The comparison base commit is not present in the local repository.", nil)
 	}
-	changeSet := records.ChangeSet{
-		ID:                      id,
-		BaseCommit:              baseCommit,
-		Intent:                  intent,
-		Operations:              []records.RequirementOperation{},
-		AffectedInterfaces:      append([]string{}, parsed.list("affected-interface")...),
-		AffectedScopes:          append([]string(nil), parsed.list("affected-scope")...),
-		ImplementationRequired:  implementationRequired,
-		ImplementationRationale: parsed.one("implementation-rationale"),
-		Created:                 created,
-	}
-	staged := cloneSnapshot(state.snapshot)
-	changeSetPath, err := upsertChangeSet(&staged, changeSet)
-	if err != nil {
-		return nil, Mutation{}, internalFailure("the change-set path could not be determined")
-	}
-	if failure := validateCandidateForChangeSet(staged, id, true); failure != nil {
-		return nil, Mutation{}, failure
-	}
-	writes := []fileWrite{}
-	if err := addWrite(&writes, changeSetPath, changeSet); err != nil {
-		return nil, Mutation{}, internalFailure("the change set could not be serialized")
-	}
-	if err := addConfigWrite(state.root, &staged, &writes, state.observed); err != nil {
-		return nil, Mutation{}, configWriteFailure(err, "the project configuration could not be serialized")
-	}
-	mutation, failure := applyStateTransaction(state, writes, func() *commandFailure { return persistedValidation(state.root, true, id) })
-	if failure != nil {
-		return nil, Mutation{}, failure
-	}
-	return changeSetCreateData{ChangeSet: changeSetCreateRecord{
-		ID: id, BaseCommit: baseCommit, ManifestPath: changeSetPath,
-	}}, mutation, nil
-}
-
-type changeSetCreateData struct {
-	ChangeSet changeSetCreateRecord `json:"change_set"`
-}
-
-type changeSetCreateRecord struct {
-	ID           string `json:"id"`
-	BaseCommit   string `json:"base_commit"`
-	ManifestPath string `json:"manifest_path"`
+	return specvalidation.ImpactForChangeSet(value, value.BaseCommit, state.snapshot), Mutation{}, nil
 }
 
 func parseBoolOption(parsed options, name string) (bool, *commandFailure) {
