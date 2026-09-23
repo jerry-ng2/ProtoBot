@@ -156,6 +156,25 @@ agents must follow these rules:
    Blindly copying behavioral configuration from a sibling can
    produce incorrect dispatch or workflow behavior.
 
+3. **Link a GitHub issue or justify why none is needed.**
+   When a change reverses or corrects a documented business
+   rule in a skill file, link a GitHub issue that describes
+   the incorrect prior behavior and its impact, or include
+   an explicit justification in the PR description for why
+   no issue is needed. For example, a change verified live
+   against production data in a single session may omit a
+   linked issue. Absence of both is a defect.
+
+4. **Review agents must check for a linked issue or
+   justification.** When reviewing a PR that creates or
+   modifies a skill file, verify that a change that reverses
+   or corrects a documented business rule either links a
+   GitHub issue describing the incorrect prior behavior and
+   its impact, or includes an explicit justification in the
+   PR description for why no issue is needed. Findings should
+   include the absence of both, not only formatting and
+   specification-hierarchy checks.
+
 ### Aligning skills with the specification hierarchy
 
 A skill that implements or describes a ProtoBot or Specification
