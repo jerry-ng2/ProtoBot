@@ -125,7 +125,8 @@ func checkState() (projectState, *commandFailure) {
 		}
 		return projectState{}, ioFailure("project.configuration_unreadable", "The project configuration could not be inspected.")
 	}
-	context := specvalidation.ValidationContext{}
+	snapshot, _ := specvalidation.Load(root)
+	context := specvalidation.ValidationContext{ProposedChangeSets: proposedChangeSetIDs(root, snapshot)}
 	result := specvalidation.ValidateProjectWithContext(root, context)
 	if !result.Valid {
 		return projectState{root: root}, failureFromValidation(result, false)
@@ -257,6 +258,7 @@ func draftOnlyDiagnostic(diagnostic specvalidation.Diagnostic) bool {
 
 func draftIncompleteDiagnostic(diagnostic specvalidation.Diagnostic) bool {
 	return diagnostic.Code == "change_set.incomplete_impact" ||
+		diagnostic.Code == "change_set.stale_impact" ||
 		(diagnostic.Code == "change_set.missing_field" && diagnostic.Field == "impact_assessment")
 }
 
@@ -279,10 +281,15 @@ func validateCandidateForChangeSet(snapshot specvalidation.Snapshot, changeSetID
 	return validateCandidate(snapshot, allowDraft)
 }
 
-func validateScopedCheck(snapshot specvalidation.Snapshot, targetIndex int) *commandFailure {
-	scopedContext := specvalidation.ValidationContext{}
+func validateScopedCheck(root string, snapshot specvalidation.Snapshot, targetIndex int) *commandFailure {
+	targetID := snapshot.ChangeSets[targetIndex].Value.ID
+	proposed := map[string]bool{}
+	if !changeSetApprovedAt(root, snapshot.Config.Repository.DefaultBranch, snapshot.ChangeSets[targetIndex].Path) {
+		proposed[targetID] = true
+	}
+	scopedContext := specvalidation.ValidationContext{ProposedChangeSets: proposed}
 	fullSnapshot := cloneSnapshot(snapshot)
-	fullSnapshot.Context = scopedContext
+	fullSnapshot.Context = specvalidation.ValidationContext{ProposedChangeSets: proposedChangeSetIDs(root, snapshot)}
 	full := specvalidation.Validate(fullSnapshot)
 	staged := cloneSnapshot(snapshot)
 	target := staged.ChangeSets[targetIndex]

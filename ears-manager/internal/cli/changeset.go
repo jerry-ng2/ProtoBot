@@ -1,0 +1,495 @@
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sort"
+	"strings"
+	"syscall"
+
+	"github.com/redhat-et/protobot/ears-manager/internal/records"
+	"github.com/redhat-et/protobot/ears-manager/internal/specvalidation"
+)
+
+func runChangeSetList(args []string) (any, Mutation, *commandFailure) {
+	parsed, failure := parseOptions(args, valueOptions("status", "interface", "scope"))
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	if parsed.has("status") && !validChangeSetStatus(parsed.one("status")) {
+		return nil, Mutation{}, validationFailure("change_set.invalid_status", fmt.Sprintf("Unsupported change-set status %q.", parsed.one("status")), nil)
+	}
+	if parsed.has("interface") {
+		if err := records.ValidateInterfaceID(parsed.one("interface")); err != nil {
+			return nil, Mutation{}, invalidIDFailure("interface.invalid_id", "Interface", parsed.one("interface"))
+		}
+	}
+	state, failure := loadState()
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	items := make([]changeSetListItem, 0)
+	for _, document := range state.snapshot.ChangeSets {
+		value := records.CanonicalChangeSet(document.Value)
+		status := derivedChangeSetStatus(state, document.Path)
+		if parsed.has("status") && status != parsed.one("status") {
+			continue
+		}
+		if parsed.has("interface") && !containsListValue(value.AffectedInterfaces, parsed.one("interface")) {
+			continue
+		}
+		if parsed.has("scope") && !containsListValue(value.AffectedScopes, parsed.one("scope")) {
+			continue
+		}
+		item := changeSetListItem{changeSetJSON: toChangeSetJSON(value), Status: status}
+		items = append(items, item)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	return struct {
+		ChangeSets []changeSetListItem `json:"change_sets"`
+	}{ChangeSets: items}, Mutation{}, nil
+}
+
+type changeSetListItem struct {
+	changeSetJSON
+	Status string `json:"status"`
+}
+
+func runChangeSetShow(args []string) (any, Mutation, *commandFailure) {
+	parsed, failure := parseOptions(args, valueOptions("change-set"))
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	id, failure := requireOption(parsed, "change-set")
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	if err := records.ValidateChangeSetID(id); err != nil {
+		return nil, Mutation{}, invalidIDFailure("change_set.invalid_id", "Change-set", id)
+	}
+	state, failure := loadState()
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	index, value, exists := findChangeSet(state.snapshot, id)
+	if !exists {
+		return nil, Mutation{}, validationFailure("change_set.not_found", fmt.Sprintf("Change set %s was not found.", id), nil)
+	}
+	value = records.CanonicalChangeSet(value)
+	manifestPath := state.snapshot.ChangeSets[index].Path
+	return changeSetShowData{
+		ChangeSet:       toChangeSetJSON(value),
+		Status:          derivedChangeSetStatus(state, manifestPath),
+		ChangedCount:    len(value.Operations) + len(value.InterfaceOperations) + len(value.ArtifactOperations),
+		ApplicableCount: applicableCount(value.ImpactAssessment),
+		ManifestPath:    manifestPath,
+		Paths:           changeSetTouchedPaths(state.snapshot, value, manifestPath),
+	}, Mutation{}, nil
+}
+
+type changeSetShowData struct {
+	ChangeSet       changeSetJSON `json:"change_set"`
+	Status          string        `json:"status"`
+	ChangedCount    int           `json:"changed_count"`
+	ApplicableCount int           `json:"applicable_count"`
+	ManifestPath    string        `json:"manifest_path"`
+	Paths           []string      `json:"paths"`
+}
+
+func runChangeSetUpdate(args []string, stdin io.Reader) (any, Mutation, *commandFailure) {
+	parsed, failure := parseOptions(args, valueOptions(
+		"change-set", "intent", "affected-interface", "affected-scope", "base-commit",
+		"implementation-required", "implementation-rationale", "impact-file",
+	))
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	id, failure := requireOption(parsed, "change-set")
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	if !hasChangeSetUpdate(parsed) {
+		return nil, Mutation{}, usageFailure("change-set update requires at least one field to update")
+	}
+	state, failure := loadState()
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	index, current, failure := proposedChangeSetForUpdate(state, id, parsed.one("base-commit"))
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	before := records.CanonicalChangeSet(current)
+	updated := cloneChangeSet(before)
+	if parsed.has("intent") {
+		updated.Intent = parsed.one("intent")
+	}
+	if parsed.has("affected-interface") {
+		updated.AffectedInterfaces = append([]string{}, parsed.list("affected-interface")...)
+	}
+	if parsed.has("affected-scope") {
+		updated.AffectedScopes = append([]string{}, parsed.list("affected-scope")...)
+	}
+	if parsed.has("base-commit") {
+		baseCommit, failure := parseCommitOption(parsed.one("base-commit"))
+		if failure != nil {
+			return nil, Mutation{}, failure
+		}
+		if !commitExists(state.root, baseCommit) {
+			return nil, Mutation{}, validationFailure("change_set.invalid_base", "The comparison base commit is not present in the local repository.", nil)
+		}
+		if !strings.EqualFold(state.head, baseCommit) {
+			return nil, Mutation{}, conflictFailure("change_set.base_mismatch", fmt.Sprintf("Change set %s cannot refresh to %s while the working tree is at %s.", id, baseCommit, state.head), nil)
+		}
+		updated.BaseCommit = baseCommit
+	}
+	if parsed.has("implementation-required") {
+		required, failure := parseBoolOption(parsed, "implementation-required")
+		if failure != nil {
+			return nil, Mutation{}, failure
+		}
+		updated.ImplementationRequired = required
+	}
+	if parsed.has("implementation-rationale") {
+		updated.ImplementationRationale = parsed.one("implementation-rationale")
+	}
+	if parsed.has("impact-file") {
+		assessment, failure := readImpactFile(parsed.one("impact-file"), stdin)
+		if failure != nil {
+			return nil, Mutation{}, failure
+		}
+		updated.ImpactAssessment = assessment
+	}
+	updated = records.CanonicalChangeSet(updated)
+	staged := cloneSnapshot(state.snapshot)
+	staged.ChangeSets[index].Value = updated
+	allowDraft := !parsed.has("impact-file")
+	if failure := validateCandidateForChangeSet(staged, id, allowDraft); failure != nil {
+		return nil, Mutation{}, failure
+	}
+	writes := []fileWrite{}
+	if err := addWrite(&writes, staged.ChangeSets[index].Path, updated); err != nil {
+		return nil, Mutation{}, internalFailure("the change set could not be serialized")
+	}
+	if err := addConfigWrite(state.root, &staged, &writes, state.observed); err != nil {
+		return nil, Mutation{}, configWriteFailure(err, "the project configuration could not be serialized")
+	}
+	mutation, failure := applyStateTransaction(state, writes, func() *commandFailure { return persistedValidation(state.root, allowDraft, id) })
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	requirements := requirementIndex(staged)
+	beforeStatus := specvalidation.ChangeSetAssessmentStatus(before, mechanicalCandidates(before, staged), requirements)
+	afterStatus := specvalidation.ChangeSetAssessmentStatus(updated, mechanicalCandidates(updated, staged), requirements)
+	changedPaths := append([]string(nil), mutation.Paths...)
+	sort.Strings(changedPaths)
+	return changeSetUpdateData{
+		ChangeSetID:      id,
+		Before:           changeSetUpdateSummaryJSON(before, beforeStatus, parsed),
+		After:            changeSetUpdateSummaryJSON(updated, afterStatus, parsed),
+		AssessmentStatus: afterStatus,
+		ChangedPaths:     changedPaths,
+	}, mutation, nil
+}
+
+type changeSetUpdateData struct {
+	ChangeSetID      string                 `json:"change_set_id"`
+	Before           changeSetUpdateSummary `json:"before"`
+	After            changeSetUpdateSummary `json:"after"`
+	AssessmentStatus string                 `json:"assessment_status"`
+	ChangedPaths     []string               `json:"changed_paths"`
+}
+
+type changeSetUpdateSummary struct {
+	Intent                  string                 `json:"intent,omitempty"`
+	BaseCommit              string                 `json:"base_commit,omitempty"`
+	AffectedInterfaces      []string               `json:"affected_interfaces"`
+	AffectedScopes          []string               `json:"affected_scopes"`
+	ImplementationRequired  *bool                  `json:"implementation_required,omitempty"`
+	ImplementationRationale string                 `json:"implementation_rationale,omitempty"`
+	AssessmentStatus        string                 `json:"assessment_status"`
+	ImpactAssessment        []impactAssessmentJSON `json:"impact_assessment,omitempty"`
+}
+
+func runChangeSetCompare(args []string) (any, Mutation, *commandFailure) {
+	parsed, failure := parseOptions(args, valueOptions("change-set", "against"))
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	id, failure := requireOption(parsed, "change-set")
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	if err := records.ValidateChangeSetID(id); err != nil {
+		return nil, Mutation{}, invalidIDFailure("change_set.invalid_id", "Change-set", id)
+	}
+	state, failure := loadState()
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	_, value, exists := findChangeSet(state.snapshot, id)
+	if !exists {
+		return nil, Mutation{}, validationFailure("change_set.not_found", fmt.Sprintf("Change set %s was not found.", id), nil)
+	}
+	against := value.BaseCommit
+	if parsed.has("against") {
+		against, failure = parseCommitOption(parsed.one("against"))
+		if failure != nil {
+			return nil, Mutation{}, failure
+		}
+		if !commitExists(state.root, against) {
+			return nil, Mutation{}, validationFailure("change_set.invalid_base", "The comparison base commit is not present in the local repository.", nil)
+		}
+	}
+	return specvalidation.CompareChangeSet(value, against, state.snapshot), Mutation{}, nil
+}
+
+func runImpact(args []string) (any, Mutation, *commandFailure) {
+	parsed, failure := parseOptions(args, valueOptions("change-set"))
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	id, failure := requireOption(parsed, "change-set")
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	if err := records.ValidateChangeSetID(id); err != nil {
+		return nil, Mutation{}, invalidIDFailure("change_set.invalid_id", "Change-set", id)
+	}
+	state, failure := loadState()
+	if failure != nil {
+		return nil, Mutation{}, failure
+	}
+	_, value, exists := findChangeSet(state.snapshot, id)
+	if !exists {
+		return nil, Mutation{}, validationFailure("change_set.not_found", fmt.Sprintf("Change set %s was not found.", id), nil)
+	}
+	return specvalidation.ImpactForChangeSet(value, value.BaseCommit, state.snapshot), Mutation{}, nil
+}
+
+func proposedChangeSetForUpdate(state projectState, id, requestedBase string) (int, records.ChangeSet, *commandFailure) {
+	if err := records.ValidateChangeSetID(id); err != nil {
+		return -1, records.ChangeSet{}, invalidIDFailure("change_set.invalid_id", "Change-set", id)
+	}
+	index, value, exists := findChangeSet(state.snapshot, id)
+	if !exists {
+		return -1, records.ChangeSet{}, validationFailure("change_set.not_found", fmt.Sprintf("Change set %s was not found.", id), nil)
+	}
+	manifestPath := state.snapshot.ChangeSets[index].Path
+	if changeSetApprovedAt(state.root, state.snapshot.Config.Repository.DefaultBranch, manifestPath) {
+		return -1, records.ChangeSet{}, conflictFailure("change_set.not_proposed", fmt.Sprintf("Change set %s is approved and immutable.", id), nil)
+	}
+	if strings.TrimSpace(requestedBase) != "" {
+		return index, cloneChangeSet(value), nil
+	}
+	if value.BaseCommit == "" {
+		return -1, records.ChangeSet{}, validationFailure("change_set.not_proposed", fmt.Sprintf("Change set %s has no base commit.", id), nil)
+	}
+	if !strings.EqualFold(state.head, value.BaseCommit) {
+		return -1, records.ChangeSet{}, conflictFailure("change_set.base_mismatch", fmt.Sprintf("Change set %s is based on %s, but the working tree is at %s.", id, value.BaseCommit, state.head), nil)
+	}
+	return index, cloneChangeSet(value), nil
+}
+
+func hasChangeSetUpdate(parsed options) bool {
+	for _, name := range []string{"intent", "affected-interface", "affected-scope", "base-commit", "implementation-required", "implementation-rationale", "impact-file"} {
+		if parsed.has(name) {
+			return true
+		}
+	}
+	return false
+}
+
+func readImpactFile(path string, stdin io.Reader) ([]records.ImpactAssessment, *commandFailure) {
+	var data []byte
+	var err error
+	if path == "-" {
+		data, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, validationFailure("input.invalid_source", "The impact file could not be read from stdin.", nil)
+		}
+	} else {
+		data, err = openAndReadRegularFile(func() (*os.File, error) {
+			return os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+		})
+		if err != nil {
+			return nil, validationFailure("input.invalid_source", "The impact file must be an existing regular file.", nil)
+		}
+	}
+	var entries []impactAssessmentJSON
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, validationFailure("change_set.invalid_impact", "The impact file is not a JSON list of complete impact assessments.", nil)
+	}
+	result := make([]records.ImpactAssessment, 0, len(entries))
+	for _, entry := range entries {
+		if strings.TrimSpace(entry.RequirementID) == "" || strings.TrimSpace(entry.Disposition) == "" || strings.TrimSpace(entry.Rationale) == "" || strings.TrimSpace(entry.Origin) == "" {
+			return nil, validationFailure("change_set.invalid_impact", "Each impact assessment requires requirement_id, disposition, rationale, and origin.", nil)
+		}
+		result = append(result, records.ImpactAssessment{
+			RequirementID: entry.RequirementID,
+			Disposition:   entry.Disposition,
+			Rationale:     entry.Rationale,
+			Origin:        entry.Origin,
+		})
+	}
+	return result, nil
+}
+
+func changeSetUpdateSummaryJSON(value records.ChangeSet, status string, parsed options) changeSetUpdateSummary {
+	summary := changeSetUpdateSummary{
+		AffectedInterfaces: append([]string{}, value.AffectedInterfaces...),
+		AffectedScopes:     append([]string{}, value.AffectedScopes...),
+		AssessmentStatus:   status,
+	}
+	if summary.AffectedInterfaces == nil {
+		summary.AffectedInterfaces = []string{}
+	}
+	if summary.AffectedScopes == nil {
+		summary.AffectedScopes = []string{}
+	}
+	if parsed.has("intent") {
+		summary.Intent = value.Intent
+	}
+	if parsed.has("base-commit") {
+		summary.BaseCommit = value.BaseCommit
+	}
+	if parsed.has("implementation-required") {
+		required := value.ImplementationRequired
+		summary.ImplementationRequired = &required
+	}
+	if parsed.has("implementation-rationale") {
+		summary.ImplementationRationale = value.ImplementationRationale
+	}
+	if parsed.has("impact-file") || len(value.ImpactAssessment) > 0 {
+		summary.ImpactAssessment = make([]impactAssessmentJSON, 0, len(value.ImpactAssessment))
+		for _, assessment := range value.ImpactAssessment {
+			summary.ImpactAssessment = append(summary.ImpactAssessment, toImpactAssessmentJSON(assessment))
+		}
+	}
+	return summary
+}
+
+func derivedChangeSetStatus(state projectState, manifestPath string) string {
+	if changeSetApprovedAt(state.root, state.snapshot.Config.Repository.DefaultBranch, manifestPath) {
+		return "approved"
+	}
+	return "proposed"
+}
+
+func changeSetApprovedAt(root, defaultBranch, manifestPath string) bool {
+	branch := strings.TrimSpace(defaultBranch)
+	if branch == "" {
+		branch = "main"
+	}
+	relative := filepath.ToSlash(manifestPath)
+	if relative == "" {
+		return false
+	}
+	err := exec.Command("git", "-C", root, "cat-file", "-e", "refs/heads/"+branch+":"+relative).Run()
+	return err == nil
+}
+
+func proposedChangeSetIDs(root string, snapshot specvalidation.Snapshot) map[string]bool {
+	proposed := make(map[string]bool, len(snapshot.ChangeSets))
+	branch := snapshot.Config.Repository.DefaultBranch
+	for _, document := range snapshot.ChangeSets {
+		if document.Value.ID == "" {
+			continue
+		}
+		if !changeSetApprovedAt(root, branch, document.Path) {
+			proposed[document.Value.ID] = true
+		}
+	}
+	return proposed
+}
+
+func changeSetTouchedPaths(snapshot specvalidation.Snapshot, changeSet records.ChangeSet, manifestPath string) []string {
+	paths := []string{manifestPath}
+	for _, operation := range changeSet.Operations {
+		path, err := storePath(snapshot.Config, records.RequirementStore, operation.RequirementID)
+		if err == nil {
+			paths = append(paths, path)
+		}
+	}
+	for _, operation := range changeSet.InterfaceOperations {
+		path, err := storePath(snapshot.Config, records.InterfaceStore, operation.InterfaceID)
+		if err == nil {
+			paths = append(paths, path)
+		}
+	}
+	artifacts := make(map[string]string, len(snapshot.Config.Artifacts))
+	for _, artifact := range snapshot.Config.Artifacts {
+		artifacts[artifact.ID] = artifact.Path
+	}
+	for _, operation := range changeSet.ArtifactOperations {
+		if path := artifacts[operation.ArtifactID]; path != "" {
+			paths = append(paths, path)
+		}
+	}
+	sort.Strings(paths)
+	return uniqueStrings(paths)
+}
+
+func applicableCount(values []records.ImpactAssessment) int {
+	count := 0
+	for _, assessment := range values {
+		if assessment.Disposition == "applicable" {
+			count++
+		}
+	}
+	return count
+}
+
+func mechanicalCandidates(changeSet records.ChangeSet, snapshot specvalidation.Snapshot) map[string]bool {
+	report := specvalidation.ImpactForChangeSet(changeSet, changeSet.BaseCommit, snapshot)
+	result := make(map[string]bool, len(report.Candidates))
+	for _, candidate := range report.Candidates {
+		result[candidate.RequirementID] = true
+	}
+	return result
+}
+
+func requirementIndex(snapshot specvalidation.Snapshot) map[string]records.Requirement {
+	result := make(map[string]records.Requirement, len(snapshot.Requirements))
+	for _, document := range snapshot.Requirements {
+		if document.Value.ID == "" {
+			continue
+		}
+		result[document.Value.ID] = records.CanonicalRequirement(document.Value)
+	}
+	return result
+}
+
+func parseCommitOption(value string) (string, *commandFailure) {
+	value = strings.TrimSpace(value)
+	if len(value) != 40 {
+		return "", validationFailure("change_set.invalid_base", "Comparison commits must be a full 40-character hexadecimal Git object ID.", nil)
+	}
+	for _, character := range value {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", character) {
+			return "", validationFailure("change_set.invalid_base", "Comparison commits must be a full 40-character hexadecimal Git object ID.", nil)
+		}
+	}
+	return strings.ToLower(value), nil
+}
+
+func commitExists(root, commit string) bool {
+	return exec.Command("git", "-C", root, "cat-file", "-e", commit+"^{commit}").Run() == nil
+}
+
+func validChangeSetStatus(value string) bool {
+	return value == "proposed" || value == "approved"
+}
+
+func containsListValue(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}

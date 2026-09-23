@@ -90,14 +90,13 @@ go install github.com/redhat-et/protobot/source-control-manager/cmd/source-contr
 ### First `ears-manager` release
 
 The first command slice provides `check`, requirement add/list/show/update/
-retire, interface add/list/show, artifact get/put, and minimal proposed
-change-set creation. Writes are validated against a candidate specification
-before an atomic file transaction is applied; JSON output and exit statuses
-are deterministic.
+retire, interface add/list/show, artifact get/put, proposed change-set
+create/list/show/update/compare, and deterministic `impact` analysis. Writes
+are validated against a candidate specification before an atomic file
+transaction is applied; JSON output and exit statuses are deterministic.
 
-Project bootstrap, immutable historical `--at` reads, change-set comparison
-and impact analysis, and governed Git branch/commit/pull-request automation
-remain separate follow-on work.
+Project bootstrap, immutable historical `--at` reads, and governed Git
+branch/commit/pull-request automation remain separate follow-on work.
 
 ## Documentation
 

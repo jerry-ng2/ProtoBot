@@ -72,10 +72,22 @@ func dispatch(args []string, stdin io.Reader) (any, Mutation, *commandFailure) {
 		if len(args) < 2 {
 			return nil, Mutation{}, usageFailure("a change-set subcommand is required")
 		}
-		if args[1] == "create" {
+		switch args[1] {
+		case "create":
 			return runChangeSetCreate(args[2:])
+		case "list":
+			return runChangeSetList(args[2:])
+		case "show":
+			return runChangeSetShow(args[2:])
+		case "update":
+			return runChangeSetUpdate(args[2:], stdin)
+		case "compare":
+			return runChangeSetCompare(args[2:])
+		default:
+			return nil, Mutation{}, usageFailure(fmt.Sprintf("unsupported change-set subcommand %q", args[1]))
 		}
-		return nil, Mutation{}, usageFailure(fmt.Sprintf("unsupported change-set subcommand %q", args[1]))
+	case "impact":
+		return runImpact(args[1:])
 	default:
 		return nil, Mutation{}, usageFailure(fmt.Sprintf("unknown command %q", args[0]))
 	}
@@ -104,7 +116,7 @@ func runCheck(args []string) (any, Mutation, *commandFailure) {
 		if !exists {
 			return nil, Mutation{}, validationFailure("change_set.not_found", fmt.Sprintf("Change set %s was not found.", parsed.one("change-set")), nil)
 		}
-		if failure := validateScopedCheck(state.snapshot, index); failure != nil {
+		if failure := validateScopedCheck(state.root, state.snapshot, index); failure != nil {
 			return nil, Mutation{}, failure
 		}
 	} else {
@@ -648,6 +660,10 @@ func proposedChangeSet(state projectState, id string) (int, records.ChangeSet, *
 	index, value, exists := findChangeSet(state.snapshot, id)
 	if !exists {
 		return -1, records.ChangeSet{}, validationFailure("change_set.not_proposed", fmt.Sprintf("Change set %s was not found.", id), nil)
+	}
+	manifestPath := state.snapshot.ChangeSets[index].Path
+	if changeSetApprovedAt(state.root, state.snapshot.Config.Repository.DefaultBranch, manifestPath) {
+		return -1, records.ChangeSet{}, conflictFailure("change_set.not_proposed", fmt.Sprintf("Change set %s is approved and immutable.", id), nil)
 	}
 	if value.BaseCommit == "" {
 		return -1, records.ChangeSet{}, validationFailure("change_set.not_proposed", fmt.Sprintf("Change set %s has no base commit.", id), nil)

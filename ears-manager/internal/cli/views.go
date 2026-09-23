@@ -1,6 +1,10 @@
 package cli
 
-import "github.com/redhat-et/protobot/ears-manager/internal/records"
+import (
+	"strings"
+
+	"github.com/redhat-et/protobot/ears-manager/internal/records"
+)
 
 type requirementJSON struct {
 	ID            string               `json:"id"`
@@ -121,4 +125,66 @@ type artifactOperationJSON struct {
 
 func toArtifactOperationJSON(value records.ArtifactOperation) artifactOperationJSON {
 	return artifactOperationJSON{Action: value.Action, ArtifactID: value.ArtifactID, Rationale: value.Rationale}
+}
+
+type impactAssessmentJSON struct {
+	RequirementID string `json:"requirement_id"`
+	Disposition   string `json:"disposition"`
+	Rationale     string `json:"rationale"`
+	Origin        string `json:"origin"`
+}
+
+func toImpactAssessmentJSON(value records.ImpactAssessment) impactAssessmentJSON {
+	return impactAssessmentJSON{
+		RequirementID: value.RequirementID,
+		Disposition:   value.Disposition,
+		Rationale:     value.Rationale,
+		Origin:        value.Origin,
+	}
+}
+
+type changeSetJSON struct {
+	ID                      string                     `json:"id"`
+	BaseCommit              string                     `json:"base_commit"`
+	Intent                  string                     `json:"intent"`
+	Operations              []requirementOperationJSON `json:"operations"`
+	InterfaceOperations     []interfaceOperationJSON   `json:"interface_operations,omitempty"`
+	ArtifactOperations      []artifactOperationJSON    `json:"artifact_operations,omitempty"`
+	AffectedInterfaces      []string                   `json:"affected_interfaces"`
+	AffectedScopes          []string                   `json:"affected_scopes,omitempty"`
+	ImplementationRequired  bool                       `json:"implementation_required"`
+	ImplementationRationale string                     `json:"implementation_rationale,omitempty"`
+	ImpactAssessment        []impactAssessmentJSON     `json:"impact_assessment,omitempty"`
+	Created                 string                     `json:"created"`
+}
+
+func toChangeSetJSON(value records.ChangeSet) changeSetJSON {
+	value = records.CanonicalChangeSet(value)
+	result := changeSetJSON{
+		ID:                      value.ID,
+		BaseCommit:              strings.ToLower(value.BaseCommit),
+		Intent:                  value.Intent,
+		Operations:              []requirementOperationJSON{},
+		AffectedInterfaces:      append([]string{}, value.AffectedInterfaces...),
+		AffectedScopes:          append([]string{}, value.AffectedScopes...),
+		ImplementationRequired:  value.ImplementationRequired,
+		ImplementationRationale: value.ImplementationRationale,
+		Created:                 value.Created,
+	}
+	if result.AffectedInterfaces == nil {
+		result.AffectedInterfaces = []string{}
+	}
+	for _, operation := range value.Operations {
+		result.Operations = append(result.Operations, toRequirementOperationJSON(operation))
+	}
+	for _, operation := range value.InterfaceOperations {
+		result.InterfaceOperations = append(result.InterfaceOperations, toInterfaceOperationJSON(operation))
+	}
+	for _, operation := range value.ArtifactOperations {
+		result.ArtifactOperations = append(result.ArtifactOperations, toArtifactOperationJSON(operation))
+	}
+	for _, assessment := range value.ImpactAssessment {
+		result.ImpactAssessment = append(result.ImpactAssessment, toImpactAssessmentJSON(assessment))
+	}
+	return result
 }
