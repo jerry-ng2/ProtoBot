@@ -157,27 +157,26 @@ agents must follow these rules:
    produce incorrect dispatch or workflow behavior.
 
 3. **Link a GitHub issue or justify why none is needed.**
-   When a change reverses or corrects a documented business
-   rule in a skill file, link a GitHub issue describing
-   incorrect prior behavior and its impact, or include an
-   explicit justification in the PR description for why no
-   issue is needed (e.g., single-session live production
-   verification). Absence of both is a defect. A documented
-   business rule is a criterion for when a skill acts or
-   what conditions gate decisions (e.g., status-move
-   eligibility). Changes altering those criteria are in
-   scope, including bugfixes; orchestration tweaks and
-   non-behavioral edits leaving criteria unchanged are not.
+   When reversing or correcting a documented business rule
+   in a skill file, prefer linking a GitHub issue describing
+   incorrect prior behavior and impact. A PR justification
+   must detail that same substance and why no issue was filed;
+   absence of both or a vacuous justification is a defect.
+   Documented business rules gate decisions or skill actions
+   (e.g., status moves). Scope is governed by diff criteria
+   changes, not author labels (defaulting in-scope when
+   uncertain); edits leaving criteria unchanged are out of scope.
 
 4. **Review agents must check for a linked issue or
    justification.** When reviewing a PR that creates or
    modifies a skill file, verify that a change reversing or
-   correcting a documented business rule either links a
-   GitHub issue describing incorrect prior behavior and its
-   impact, or includes an explicit justification in the PR
-   description for why no issue is needed. Findings should
-   include the absence of both, not only formatting and
-   specification-hierarchy checks.
+   correcting a documented business rule links an issue or
+   provides a substantive justification covering prior
+   behavior, impact, and why no issue was filed. Review agents
+   must reject vacuous justifications and treat uncertain
+   criteria changes as in scope. Findings should include
+   missing or inadequate issues and justifications, not only
+   formatting and specification-hierarchy checks.
 
 ### Aligning skills with the specification hierarchy
 
