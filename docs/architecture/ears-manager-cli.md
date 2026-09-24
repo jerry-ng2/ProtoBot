@@ -94,9 +94,11 @@ Reads are root-relative and deterministic:
 - `check`, `change-set compare`, and `impact` read the complete relevant
   store rather than trusting a caller-provided subset.
 
-The optional `--at <full-commit-sha>` selector is read-only and is accepted
-only by read and analysis commands. It must name a full 40-character commit
-present in the local repository. The default is the current working tree.
+In the target contract, the optional `--at <full-commit-sha>` selector
+provides read-revision semantics accepted only by read and analysis commands
+(deferred from the EM-04/EM-05 implemented subset to follow-on scope). It must
+name a full 40-character commit present in the local repository. The default is
+the current working tree.
 
 ### Write authority
 
@@ -229,13 +231,14 @@ ears-manager impact
 ### EM-04 first-release scope
 
 The command surface above is the target caller contract. The EM-04 first
-release implements only `check`, requirement add/list/show/update/retire,
+release implements `check`, requirement add/list/show/update/retire,
 interface add/list/show, artifact get/put, and minimal proposed change-set
-creation. Project initialization, artifact listing, interface updates,
-change-set listing/show/update/compare, impact analysis, immutable `--at`
-reads, and governed branch/commit/pull-request automation remain follow-on
-work. The first-release dispatcher must not claim those operations are
-available.
+creation. EM-05 adds change-set list/show/update/compare and `impact`,
+including proposed-change-set impact-completeness checks. Project
+initialization, artifact listing, interface updates, immutable `--at`
+reads, explicit `--against` comparison revisions, and governed
+branch/commit/pull-request automation remain follow-on work. The
+dispatcher must not claim those remaining operations are available.
 
 In the first release, `change-set create` allocates the ID, records the base
 commit, and writes the manifest. It does not create or check out the change-set
@@ -392,7 +395,7 @@ impact --change-set CS-ID [--at FULL-SHA]
 `--id` identifies a requirement, interface, or artifact. `--change-set`
 identifies a change set in every command that operates on an existing change
 set. `--at` selects the immutable read revision; `--against` selects the
-comparison baseline.
+comparison baseline (both options are deferred in the initial release).
 
 ---
 
@@ -575,10 +578,10 @@ explicit.
 | Command | Request | Success result | Diagnostic result |
 | --- | --- | --- | --- |
 | `change-set create` | Intent, affected interfaces/scopes, implementation decision, and `--created` | Change-set ID, full base commit, and manifest path; EM-04 does not return branch data or the manifest body | `change_set.no_base`, `change_set.invalid_scope`, or project diagnostics |
-| `change-set list` | Optional status, interface, scope, and `--at` filters | Proposed/approved manifests sorted by ID | `change_set.read_failed` |
-| `change-set show` | `--change-set CS-ID` and optional `--at` | Complete manifest, derived status, changed/applicable counts, and exact paths, each a file: every registered artifact and every structured requirement and interface record that the change set touches, and its manifest | `change_set.not_found` |
+| `change-set list` | Optional status, interface, and scope filters, and optional --at (deferred to follow-on scope) | Proposed/approved manifests sorted by ID | `change_set.read_failed` |
+| `change-set show` | `--change-set CS-ID` and optional --at (deferred to follow-on scope) | Complete manifest, derived status, changed/applicable counts, and exact paths, each a file: every registered artifact and every structured requirement and interface record that the change set touches, and its manifest | `change_set.not_found` |
 | `change-set update` | `--change-set CS-ID` plus metadata, base refresh, or complete impact assessment | `before`, `after`, `assessment_status`, and `changed_paths` in the result | `change_set.not_proposed`, `change_set.base_mismatch`, `change_set.invalid_impact`, or validation diagnostics |
-| `change-set compare` | `--change-set CS-ID` and optional `--against` full commit | Deterministic comparison report described below | `change_set.not_found`, `change_set.invalid_base`, or read/validation diagnostics |
+| `change-set compare` | `--change-set CS-ID` and optional `--against` full commit (deferred to follow-on scope) | Deterministic comparison report described below | `change_set.not_found`, `change_set.invalid_base`, or read/validation diagnostics |
 
 In the EM-04 first release, `change-set create` allocates the next unused
 sequence number, records a full 40-character `base_commit`, and writes the
@@ -603,19 +606,16 @@ ears-manager check [--at FULL-SHA] [--change-set CS-ID]
 `check` is read-only. Without `--change-set`, it validates the complete
 project store, registry, projection classification, all records, and all
 referential, relationship, EARS, artifact-digest, structured-store-integrity,
-and change-set rules. The EM-04 first release defers impact-completeness
-validation until the `impact` and `change-set update` commands land; the
-complete impact rules below are the target contract for that follow-on scope.
-Approved manifests' stored historical assessments remain preserved.
-Independent load failures are aggregated with semantic diagnostics from records
-that could still be read.
-In the follow-on impact scope, `--change-set` narrows that impact check to the
-named proposed manifest. "Matches"
-means that every current mechanical candidate has exactly one final recorded
-disposition, every recorded `mechanical` entry is still a current mechanical
-candidate, and every `semantic` entry names an unchanged active requirement
-that is not in the change-set operations. Semantic entries are permitted
-extras; unreviewed or duplicate entries are not.
+and change-set rules, including impact completeness for every proposed
+change set. Approved manifests' stored historical assessments remain
+preserved. Independent load failures are aggregated with semantic diagnostics
+from records that could still be read.
+`--change-set` narrows that impact check to the named proposed manifest.
+"Matches" means that every current mechanical candidate has exactly one final
+recorded disposition, every recorded `mechanical` entry is still a current
+mechanical candidate, and every `semantic` entry names an unchanged active
+requirement that is not in the change-set operations. Semantic entries are
+permitted extras; unreviewed or duplicate entries are not.
 
 Success data contains:
 
@@ -634,17 +634,17 @@ Success data contains:
 
 An invalid specification returns the failure envelope with one or more stable
 diagnostics and status `4`; project discovery or schema-version failures use
-status `3`. In the follow-on impact scope, an incomplete, stale, or mismatched
-proposed impact assessment returns status `5` so the caller refreshes and
-re-reviews state rather than revising record content. The EM-04 first release
-does not evaluate impact completeness. Approved manifests are checked against
-their stored historical assessment. `check` never repairs files.
+status `3`. An incomplete, stale, or mismatched proposed impact assessment
+returns status `5` so the caller refreshes and re-reviews state rather than
+revising record content. Approved manifests are checked against their stored
+historical assessment. `check` never repairs files.
 
 ### `change-set compare`
 
 `change-set compare` is deterministic and read-only. It compares the
 proposed change set with its `base_commit` by default; `--against` is used for
-an explicit immutable comparison revision. Its result contains:
+an explicit immutable comparison revision (deferred to follow-on scope; passing
+`--against` is rejected with `change_set.invalid_base`). Its result contains:
 
 ```json
 {
@@ -801,10 +801,10 @@ path as a workaround. Safe retries are:
 
 [`fixtures/ears-manager-cli-golden.jsonl`](fixtures/ears-manager-cli-golden.jsonl)
 is the harness-neutral follow-on fixture for the complete target contract. Its
-`fixture-scope` record identifies the subset implemented by EM-04 and
-the commands deferred to later increments. The EM-04 implementation tests
-exercise the implemented subset directly; the deferred fixture steps remain
-acceptance data for their owning follow-on issues. The fixture covers:
+`fixture-scope` record identifies the subset implemented by EM-04 and EM-05
+and the commands deferred to later increments. Implementation tests exercise
+the implemented subset directly; the deferred fixture steps remain acceptance
+data for their owning follow-on issues. The fixture covers:
 
 - project initialization;
 - change-set creation;

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -125,7 +126,12 @@ func checkState() (projectState, *commandFailure) {
 		}
 		return projectState{}, ioFailure("project.configuration_unreadable", "The project configuration could not be inspected.")
 	}
-	context := specvalidation.ValidationContext{}
+	snapshot, _ := specvalidation.Load(root)
+	proposed, failure := proposedChangeSetIDs(root, snapshot)
+	if failure != nil {
+		return projectState{root: root}, failure
+	}
+	context := specvalidation.ValidationContext{ProposedChangeSets: proposed}
 	result := specvalidation.ValidateProjectWithContext(root, context)
 	if !result.Valid {
 		return projectState{root: root}, failureFromValidation(result, false)
@@ -256,8 +262,7 @@ func draftOnlyDiagnostic(diagnostic specvalidation.Diagnostic) bool {
 }
 
 func draftIncompleteDiagnostic(diagnostic specvalidation.Diagnostic) bool {
-	return diagnostic.Code == "change_set.incomplete_impact" ||
-		(diagnostic.Code == "change_set.missing_field" && diagnostic.Field == "impact_assessment")
+	return draftOnlyDiagnostic(diagnostic)
 }
 
 func hasDiagnosticPrefix(diagnostics []specvalidation.Diagnostic, prefix string) bool {
@@ -279,10 +284,23 @@ func validateCandidateForChangeSet(snapshot specvalidation.Snapshot, changeSetID
 	return validateCandidate(snapshot, allowDraft)
 }
 
-func validateScopedCheck(snapshot specvalidation.Snapshot, targetIndex int) *commandFailure {
-	scopedContext := specvalidation.ValidationContext{}
+func validateScopedCheck(root string, snapshot specvalidation.Snapshot, targetIndex int) *commandFailure {
+	targetID := snapshot.ChangeSets[targetIndex].Value.ID
+	proposed := map[string]bool{}
+	approved, failure := changeSetApprovedAt(root, snapshot.Config.Repository.DefaultBranch, snapshot.ChangeSets[targetIndex].Path)
+	if failure != nil {
+		return failure
+	}
+	if !approved {
+		proposed[targetID] = true
+	}
+	scopedContext := specvalidation.ValidationContext{ProposedChangeSets: proposed}
 	fullSnapshot := cloneSnapshot(snapshot)
-	fullSnapshot.Context = scopedContext
+	proposedIDs, failure := proposedChangeSetIDs(root, snapshot)
+	if failure != nil {
+		return failure
+	}
+	fullSnapshot.Context = specvalidation.ValidationContext{ProposedChangeSets: proposedIDs}
 	full := specvalidation.Validate(fullSnapshot)
 	staged := cloneSnapshot(snapshot)
 	target := staged.ChangeSets[targetIndex]
@@ -855,4 +873,102 @@ func readRegularFile(root, relative string) ([]byte, *commandFailure) {
 		return nil, ioFailure("artifact.read_failed", "The requested artifact could not be read.")
 	}
 	return data, nil
+}
+
+func resolveDefaultBranchRef(root, defaultBranch string) (string, *commandFailure) {
+	branch := strings.TrimSpace(defaultBranch)
+	if branch == "" {
+		return "", projectFailure("project.invalid_configuration", "Repository default branch is not configured.")
+	}
+	candidates := []string{
+		"refs/heads/" + branch,
+		"refs/remotes/origin/" + branch,
+	}
+	for _, candidate := range candidates {
+		cmd := exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", candidate+"^{commit}")
+		if err := cmd.Run(); err == nil {
+			return candidate, nil
+		}
+	}
+	return "", projectFailure("project.default_branch_unresolved", fmt.Sprintf("Repository default branch %q could not be resolved.", branch))
+}
+
+func changeSetApprovedAt(root, defaultBranch, manifestPath string) (bool, *commandFailure) {
+	ref, failure := resolveDefaultBranchRef(root, defaultBranch)
+	if failure != nil {
+		return false, failure
+	}
+	relative := strings.TrimPrefix(filepath.ToSlash(manifestPath), "/")
+	if relative == "" {
+		return false, projectFailure("change_set.invalid_manifest", "Manifest path is empty.")
+	}
+	cmd := exec.Command("git", "-C", root, "cat-file", "-e", ref+":"+relative)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err == nil {
+		return true, nil
+	}
+	errText := stderr.String()
+	if strings.Contains(errText, "does not exist in") || strings.Contains(errText, "not in '") {
+		return false, nil
+	}
+	return false, projectFailure("git.cat_file_failed", fmt.Sprintf("Unable to inspect manifest at %s:%s: %s", ref, relative, strings.TrimSpace(errText)))
+}
+
+func proposedChangeSetIDs(root string, snapshot specvalidation.Snapshot) (map[string]bool, *commandFailure) {
+	proposed := make(map[string]bool, len(snapshot.ChangeSets))
+	branch := snapshot.Config.Repository.DefaultBranch
+	for _, document := range snapshot.ChangeSets {
+		if document.Value.ID == "" {
+			continue
+		}
+		approved, failure := changeSetApprovedAt(root, branch, document.Path)
+		if failure != nil {
+			return nil, failure
+		}
+		if !approved {
+			proposed[document.Value.ID] = true
+		}
+	}
+	return proposed, nil
+}
+
+func commitExists(root, commit string) bool {
+	return exec.Command("git", "-C", root, "cat-file", "-e", commit+"^{commit}").Run() == nil
+}
+
+func proposedChangeSet(state projectState, id string) (int, records.ChangeSet, *commandFailure) {
+	return proposedChangeSetWithOption(state, id, false)
+}
+
+func proposedChangeSetForUpdate(state projectState, id string, allowBaseMismatch bool) (int, records.ChangeSet, *commandFailure) {
+	return proposedChangeSetWithOption(state, id, allowBaseMismatch)
+}
+
+func proposedChangeSetWithOption(state projectState, id string, allowBaseMismatch bool) (int, records.ChangeSet, *commandFailure) {
+	if err := records.ValidateChangeSetID(id); err != nil {
+		return -1, records.ChangeSet{}, invalidIDFailure("change_set.invalid_id", "Change-set", id)
+	}
+	index, value, exists := findChangeSet(state.snapshot, id)
+	if !exists {
+		return -1, records.ChangeSet{}, validationFailure("change_set.not_proposed", fmt.Sprintf("Change set %s was not found.", id), nil)
+	}
+	manifestPath := state.snapshot.ChangeSets[index].Path
+	approved, failure := changeSetApprovedAt(state.root, state.snapshot.Config.Repository.DefaultBranch, manifestPath)
+	if failure != nil {
+		return -1, records.ChangeSet{}, failure
+	}
+	if approved {
+		return -1, records.ChangeSet{}, conflictFailure("change_set.not_proposed", fmt.Sprintf("Change set %s is approved and immutable.", id), nil)
+	}
+	if allowBaseMismatch {
+		return index, cloneChangeSet(value), nil
+	}
+	if value.BaseCommit == "" {
+		return -1, records.ChangeSet{}, validationFailure("change_set.not_proposed", fmt.Sprintf("Change set %s has no base commit.", id), nil)
+	}
+	if !strings.EqualFold(state.head, value.BaseCommit) {
+		return -1, records.ChangeSet{}, conflictFailure("change_set.base_mismatch", fmt.Sprintf("Change set %s is based on %s, but the working tree is at %s.", id, value.BaseCommit, state.head), nil)
+	}
+	return index, cloneChangeSet(value), nil
 }

@@ -449,9 +449,9 @@ It is used by these callers:
 
 ### Subcommands
 
-The table describes the target `ears-manager` subcommand surface. The EM-04
-first release implements only a subset and does not create change-set branches;
-see the [`ears-manager` CLI first-release
+The table describes the target `ears-manager` subcommand surface. EM-04 and
+EM-05 implement a subset and do not create change-set branches; see the
+[`ears-manager` CLI first-release
 scope](ears-manager-cli.md#em-04-first-release-scope).
 
 | Subcommand | Purpose |
@@ -466,7 +466,7 @@ scope](ears-manager-cli.md#em-04-first-release-scope).
 | `ears-manager interface update` | Modify interfaces through a proposed change set. |
 | `ears-manager artifact put` | Create/update a registered Vision, Architecture, or external interface-IDL artifact within the active change set. Records kind/path/digest and invokes the selected code-controlled validator adapter without requiring `ears-manager` to understand every format. |
 | `ears-manager artifact get/list` | Read a registered opaque/prose/IDL artifact by ID or unique kind through the governed path registry. |
-| `ears-manager change-set create/list/show/update` | Create, inspect, and update a proposed change set. Records its base revision, intent, affected scope, and requirement operations. EM-04 first release only implements minimal creation and does not cut a branch; see the [`ears-manager` CLI first-release scope](ears-manager-cli.md#em-04-first-release-scope). Approved change sets are immutable. |
+| `ears-manager change-set create/list/show/update` | Create, inspect, and update a proposed change set. Records its base revision, intent, affected scope, requirement operations, and reviewed impact dispositions. EM-04 implemented minimal creation; EM-05 adds list/show/update. Neither cuts a branch; see the [`ears-manager` CLI first-release scope](ears-manager-cli.md#em-04-first-release-scope). Approved change sets are immutable. |
 | `ears-manager change-set compare` | Compare a proposed change set with the current Schematic and open deltas. Reports exact duplicates, stable-ID before/after changes, declared conflicts/supersession, and dependency cycles for agent/user review. |
 | `ears-manager impact` | Read-only comparison of a proposed change set with the Schematic that produces potentially applicable requirements from scope intersections and explicit relationships. Reviewed dispositions are written by `change-set update`. |
 

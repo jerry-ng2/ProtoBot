@@ -262,55 +262,12 @@ func validateImpactOrigin(result *Result, path, changeSetID, field string, asses
 }
 
 func mechanicalImpactCandidates(value records.ChangeSet, documents []Document[records.Requirement], requirements map[string]records.Requirement, changed map[string]bool) map[string]bool {
-	candidates := make(map[string]bool)
-	projectBoundary := hasProjectScope(value.AffectedScopes)
-	for changedID := range changed {
-		if requirement, exists := requirements[changedID]; exists && hasProjectScope(records.CanonicalRequirement(requirement).AppliesTo.Scopes) {
-			projectBoundary = true
-		}
-	}
-	for _, document := range documents {
-		requirement := records.CanonicalRequirement(document.Value)
-		if requirement.ID == "" || records.ValidateRequirementID(requirement.ID) != nil || changed[requirement.ID] || requirement.Status != records.StatusActive {
-			continue
-		}
-		if overlaps(value.AffectedInterfaces, requirement.AppliesTo.Interfaces) || overlaps(value.AffectedScopes, requirement.AppliesTo.Scopes) || (projectBoundary && hasProjectScope(requirement.AppliesTo.Scopes)) || requirementRelationshipTouchesChanged(requirement.ID, requirement, documents, changed) {
-			candidates[requirement.ID] = true
-		}
+	matches := impactMatches(value, documents, requirements, changed)
+	candidates := make(map[string]bool, len(matches))
+	for _, match := range matches {
+		candidates[match.requirementID] = true
 	}
 	return candidates
-}
-
-func requirementRelationshipTouchesChanged(id string, requirement records.Requirement, documents []Document[records.Requirement], changed map[string]bool) bool {
-	for _, relationship := range requirement.Relationships {
-		if changed[relationship.Target] {
-			return true
-		}
-	}
-	for _, document := range documents {
-		if !changed[document.Value.ID] {
-			continue
-		}
-		for _, relationship := range document.Value.Relationships {
-			if relationship.Target == id {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func overlaps(left, right []string) bool {
-	seen := make(map[string]bool, len(left))
-	for _, value := range left {
-		seen[value] = true
-	}
-	for _, value := range right {
-		if seen[value] {
-			return true
-		}
-	}
-	return false
 }
 
 func hasProjectScope(values []string) bool {

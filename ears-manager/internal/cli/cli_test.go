@@ -110,7 +110,7 @@ func TestGoldenFixtureDeclaresFollowOnScope(t *testing.T) {
 			break
 		}
 	}
-	if scope.Release != "follow-on" || !containsString(scope.ImplementedCommands, "check") || !containsString(scope.DeferredCommands, "impact") {
+	if scope.Release != "follow-on" || !containsString(scope.ImplementedCommands, "impact") || !containsString(scope.ImplementedCommands, "change-set compare") || containsString(scope.DeferredCommands, "impact") {
 		t.Fatalf("fixture scope = %#v", scope)
 	}
 }
