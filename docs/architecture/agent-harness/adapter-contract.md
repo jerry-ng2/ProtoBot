@@ -1078,7 +1078,7 @@ under [File-source arguments](#file-source-arguments).
 | H5 | Do nothing when a session is idle or ends | Required | The guard has no exit action | No exit hook | 10 |
 | H6 | Keep a replayable session record with the facts in [Traces](#traces) | Required | The facts | The record and its export route | 15 |
 | H7 | Run headless with replayed model turns and no permission prompt | Required | The fixture steps | A replay mechanism and a headless command | All |
-| H8 | Invoke the guard on each tool call and enforce its decision; document any per-call fail-open path | Enforcement | The guard | A hook, a plugin, or a shim, with harness-specific failure behavior | 6, 7, 14, vectors |
+| H8 | Invoke the guard on each tool call and enforce its decision; document any per-call fail-open path | Enforcement | The guard | A hook, a plugin, or a shim, with harness-specific failure behavior | 6, 7, 14, vectors; fail-open cases as recorded gaps ([File-source arguments](#file-source-arguments)) |
 | H9 | Hide file-writing, subagent, and web tools from the role | Enforcement | Guard rule 5 refuses them anyway | Native tool rules | 6 |
 | H10 | Offer the role's model only Toolkit skills in its skill list, and let the role load only those | Enforcement | `toolkit_skills`, guard rule 5 refuses a load | Native rules that hide and refuse every other skill | 3, 4 |
 | H11 | Hold no credential in binding files, and turn off session upload | Enforcement | — | Binding config | Vectors, harness checks |
@@ -1142,7 +1142,7 @@ yet known. Each binding verifies its column against the version it pins.
 | Remote `wms` server with OAuth 2.1 (H13) | Open | An HTTP MCP server with OAuth through `/mcp`; candidate | A streamable HTTP MCP server with `codex mcp login`; candidate |
 | Hide tools from the role (H9) | `"*": deny` in the agent | The agent's `tools` list and deny rules | `web_search = "disabled"` and `multi_agent = false`, observed; no setting hides `apply_patch` |
 | Restrict skills (H10) | `permission.skill` with `"*": deny` first hides every other skill from the model's list and refuses it; observed | `skillOverrides` with `off` hides and refuses a named skill; `Skill(<name>)` rules never change the list; a skill in another user's scope cannot be named in advance; observed | `include_instructions = false` removes the skill catalog, and the profile names the Toolkit skills; `[[skills.config]]` hides a named skill; observed. No skill tool: the guard refuses a read of another `SKILL.md` |
-| Call the guard (H8) | A plugin's `tool.execute.before` and a shim | A `PreToolUse` command hook; status 2 blocks and the reason reaches the model | A `PreToolUse` hook in `.codex/hooks.json`; status 2 blocks, observed; the hook needs trust, and an untrusted, crashing, or silent hook lets the call through; the launcher checks the hook file and the profile and starts Codex with `--dangerously-bypass-hook-trust`, so the hook runs, and the sandbox stays on |
+| Invoke the guard (H8) | A plugin's `tool.execute.before` and a shim | A `PreToolUse` command hook; status 2 blocks and the reason reaches the model | A `PreToolUse` hook in `.codex/hooks.json`; status 2 blocks, observed; the hook needs trust, and an untrusted, crashing, or silent hook lets the call through; the launcher checks the hook file and the profile and starts Codex with `--dangerously-bypass-hook-trust`, so the hook runs, and the sandbox stays on |
 | Role signal for the guard | The agent name from `chat.params` | `PROTOBOT_ROLE` from the role's settings `env`; `agent_type` in the hook input is undocumented | `PROTOBOT_ROLE` set at launch reaches the hook, observed; the input names no profile |
 | Headless run (H7) | `opencode run --format json` | `claude -p --output-format stream-json --permission-prompts none` | `codex exec --json` |
 | Continue a session (H4) | `--continue`, `--session` | `--continue`, `--resume` | `codex resume`, `codex exec resume` |
@@ -1283,7 +1283,8 @@ A session started in one bound harness and resumed in another, at step
 
 Each vector runs against the guard directly and through the binding's
 normal, active hook path, and must be refused before it runs. Hook-
-unavailable cases are recorded separately as explicit gaps below; a call
+unavailable cases are recorded separately as explicit gaps in
+[File-source arguments](#file-source-arguments); a call
 that passes through without a guard decision is not a successful refusal.
 Unless a row says otherwise,
 `cs/00003-<slug>` is checked out. The SCM's own refusals, such as a
