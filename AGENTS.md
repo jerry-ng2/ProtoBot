@@ -157,26 +157,28 @@ agents must follow these rules:
    produce incorrect dispatch or workflow behavior.
 
 3. **Link a GitHub issue or justify why none is needed.**
-   When reversing or correcting a documented business rule
-   in a skill file, prefer linking a GitHub issue describing
-   incorrect prior behavior and impact. A PR justification
-   must detail that same substance and why no issue was filed;
-   absence of both or a vacuous justification is a defect.
-   Documented business rules gate decisions or skill actions
-   (e.g., status moves). Scope is governed by diff criteria
-   changes, not author labels (defaulting in-scope when
-   uncertain); edits leaving criteria unchanged are out of scope.
+   When reversing or correcting a business rule, link an
+   issue describing incorrect prior behavior and impact, or
+   justify in the PR description (body) detailing that
+   substance and why no issue was filed; comment
+   acknowledgments do not qualify. Absence of both or a
+   vacuous justification is a defect. Business rules gate
+   decisions or actions (e.g., status moves); diffs
+   altering gating conditions or gated actions are in scope,
+   not author labels (defaulting in-scope when uncertain);
+   edits leaving both unchanged are not.
 
 4. **Review agents must check for a linked issue or
-   justification.** When reviewing a PR that creates or
-   modifies a skill file, verify that a change reversing or
-   correcting a documented business rule links an issue or
-   provides a substantive justification covering prior
-   behavior, impact, and why no issue was filed. Review agents
-   must reject vacuous justifications and treat uncertain
-   criteria changes as in scope. Findings should include
-   missing or inadequate issues and justifications, not only
-   formatting and specification-hierarchy checks.
+   justification.** When reviewing a PR modifying a skill
+   file, verify that reversing or correcting a business rule
+   links an issue describing incorrect prior behavior and
+   impact, or includes a PR-description justification
+   covering that substance and why no issue was filed.
+   Reject comments, vacuous justifications, and
+   non-substantive issues, treating uncertain diffs as in
+   scope. Findings should include missing or inadequate
+   issues and justifications, not only formatting and
+   specification-hierarchy checks.
 
 ### Aligning skills with the specification hierarchy
 
