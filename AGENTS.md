@@ -161,13 +161,13 @@ agents must follow these rules:
    rule in a skill file, link a GitHub issue describing
    incorrect prior behavior and its impact, or include an
    explicit justification in the PR description for why no
-   issue is needed. A documented business rule governs when
-   a skill acts or what conditions gate decisions (e.g.,
-   altering eligibility for status moves). Reversals change
-   these criteria; bugfixes, orchestration tweaks, and
-   non-behavioral edits do not. For example, single-session
-   live verification against production data may justify
-   omitting an issue. Absence of both is a defect.
+   issue is needed (e.g., single-session live production
+   verification). Absence of both is a defect. A documented
+   business rule is a criterion for when a skill acts or
+   what conditions gate decisions (e.g., status-move
+   eligibility). Changes altering those criteria are in
+   scope, including bugfixes; orchestration tweaks and
+   non-behavioral edits leaving criteria unchanged are not.
 
 4. **Review agents must check for a linked issue or
    justification.** When reviewing a PR that creates or
