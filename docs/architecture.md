@@ -678,8 +678,11 @@ defines the initial integration model:
 - **Git operations** use the tools of the
   [Source Control Manager](#source-control-manager), which cut
   the initialization branch, commit artifacts produced through
-  `ears-manager`, push, and open PRs. The agent runs no Git or
-  Git host command itself.
+  `ears-manager`, push, and open PRs. The agent is given no Git
+  or Git host command of its own; the harness guard refuses them on
+  the calls it checks, and each binding records which native or
+  sandbox rules still apply when a call passes without a guard
+  decision ([Permitted Git operations][permitted-git]).
 
 The Web Drafting Table replaces OpenCode with a hosted agent
 runtime but loads the same Specification Toolkit.
@@ -698,7 +701,14 @@ The Drafting Table agent interacts with external systems
 exclusively through governed tools defined by the
 Specification Toolkit. The agent never edits specification
 files directly — all reads and writes go through
-`ears-manager`.
+`ears-manager`. The harness guard enforces this boundary on the
+calls it checks; a call that passes without a guard decision is
+bounded only by the binding's native rules or sandbox, and the
+enforcement layers below still gate what merges
+([What the harness layer stops][layer-stops]).
+
+[layer-stops]: architecture/agent-harness/adapter-contract.md#what-the-harness-layer-stops
+[permitted-git]: architecture/git-integration.md#permitted-git-operations
 
 **Enforcement:** This rule is enforced structurally, not by
 prompting alone. The mandatory enforcement layers are:

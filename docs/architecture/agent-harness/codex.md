@@ -515,7 +515,7 @@ when the prompt text mentions `$<name>` (documented), and the guard
 does not see that route, because it is not a tool call. Whether pasted
 text, such as IdeaBot material, triggers it too is not observed. The
 route changes what the model reads, not what it can do: the guard and
-the profile bound every effect
+the profile bound every effect of a guard-checked call
 ([Untrusted input](adapter-contract.md#untrusted-input)). H10 records
 the gap, and the fixture confirms the reach of `$<name>` before H10 is
 marked met ([Open points](#open-points)).

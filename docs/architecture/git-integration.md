@@ -817,7 +817,11 @@ The SCM enforces its operation rules when called through its tools;
 branch protection and CI continue to gate merges even if the harness
 layer is off. They do not intercept direct shell `git` or `gh` calls
 that an absent guard and permissive native rules let through
-([What the harness layer stops][layer-stops]).
+([What the harness layer stops][layer-stops]). On a call without a
+guard decision, OpenCode's and Claude Code's native rules still refuse
+`git` and `gh`; Codex has no native command rules, so its sandbox
+blocks Git writes and Git host calls but not Git reads
+([File-source arguments][fail-open]).
 
 ### Allowed
 
@@ -1051,3 +1055,4 @@ resurface.
 [scm-mapping]: source-control-manager.md#mapping-to-34s-permitted-operations
 
 [layer-stops]: agent-harness/adapter-contract.md#what-the-harness-layer-stops
+[fail-open]: agent-harness/adapter-contract.md#file-source-arguments

@@ -130,8 +130,11 @@ Three rules keep the layers apart:
    [tool vocabulary](#tool-vocabulary), which has one row per harness.
 3. **A binding holds no domain logic and no policy of its own.** It
    connects the harness to the Toolkit and to the guard. Its native
-   rules may copy the core's rules as an early layer, but they never
-   allow what the core refuses.
+   rules may copy the core's rules as an early layer and add no
+   permission of their own. A native pattern can still be coarser than
+   the core, so on a call that receives no guard decision it can admit
+   a command the core refuses; each binding records those cases as
+   gaps ([File-source arguments](#file-source-arguments)).
 
 ### The session protocol is a skill
 
@@ -841,11 +844,11 @@ external source, and the later integrity and CI layers do not catch it.
 These are binding gaps, not protected behavior or successful H8
 enforcement:
 
-| Binding | Guard-unavailable case | Consequence for a file-source call |
-| --- | --- | --- |
-| [OpenCode](opencode.md) | The plugin is absent or no hook is registered; native Bash permissions have no plugin-presence check | The `ears-manager *` allow rule still admits the command, including non-`-` file-source values, `--text "$GH_TOKEN"`, output redirection, and other shell syntax that only the guard rejects |
-| [Claude Code](claude-code.md) | The hook times out, is killed, or its shim cannot run | No status 2 is returned, so the call may proceed with a non-`-` value |
-| [Codex](codex.md) | The hook is untrusted outside the launcher, crashes, exits other than 2, or times out | The call may proceed with a non-`-` value; the sandbox does not establish the source of bytes read into governed state |
+| Binding | Guard-unavailable case | Admitted without a guard decision | Still blocked by native rules or the sandbox |
+| --- | --- | --- | --- |
+| [OpenCode](opencode.md) | The plugin is absent or no hook is registered; native Bash permissions have no plugin-presence check | The `ears-manager *` allow rule still admits the command, including non-`-` file-source values, `--text "$GH_TOKEN"`, output redirection, and other shell syntax that only the guard rejects; a `read` of an in-project credential file other than `.env` | Every other shell command, including `git` and `gh` (`"*": deny`); reads of `.env`, `.git/`, and `.protobot/` stores; hidden file-writing, subagent, and web tools |
+| [Claude Code](claude-code.md) | The hook times out, is killed, or its shim cannot run | No status 2 is returned, so an `ears-manager` call may proceed with a non-`-` value, such as a credential file, or with variable expansion such as `--text "$GH_TOKEN"`; a `Read` of a credential file outside the native denies, including one outside the project | Every shell command without an allow rule, including `git` and `gh` (`dontAsk`); reads of `.env`, `.git/`, and `.protobot/` stores; hidden file-writing, subagent, and web tools |
+| [Codex](codex.md) | The hook is untrusted outside the launcher, crashes, exits other than 2, or times out | The call may proceed with a non-`-` value or variable expansion; any shell command, including Git reads; the sandbox bounds writes, not reads, so a host credential file can reach the model or governed state, and the sandbox does not establish the source of bytes read into governed state | Writes outside the working tree and `$TMPDIR`, writes under `.git/`, and shell network access, so Git writes and Git host calls fail; hidden web and subagent tools |
 
 The binding status and fixture must keep these failure modes visible. A
 call with no guard decision is not a refusal, and a fixture that exercises
@@ -863,13 +866,17 @@ only the successful hook path does not establish fail-closed behavior.
 - **A local harness uses the user's own credentials, in every mode.**
   The SCM runs Git and `gh`, which use the user's credential helper and
   `gh`'s own store, whether the project's `review_mode` is
-  single-player or multi-player. The Drafting Table role runs neither,
-  and cannot print a credential: environment and file-printing
-  commands are not shell operations, credential-file reads, reads
-  under `.git/`, and reads outside the project are refused, variable
-  expansion is refused, and the SCM prints no remote URL and refuses a
-  canonical remote whose URL carries userinfo other than the fixed
-  `git@` of the SCP form, as `ears-manager` accepts it.
+  single-player or multi-player. On every call that receives a guard
+  decision, the Drafting Table role runs neither and cannot print a
+  credential: environment and file-printing commands are not shell
+  operations, credential-file reads, reads under `.git/`, and reads
+  outside the project are refused, and variable expansion is refused.
+  Independently of the guard, the SCM prints no remote URL and refuses
+  a canonical remote whose URL carries userinfo other than the fixed
+  `git@` of the SCP form, as `ears-manager` accepts it. A call that a
+  binding passes through without a guard decision loses the guard's
+  refusals; each binding's resulting credential exposure is listed
+  under [File-source arguments](#file-source-arguments).
 - **The limit of a local harness.** The agent runs as the user, on the
   user's machine. The adapter narrows what the Drafting Table role can
   reach; it does not isolate a token from the user's own shell or from
@@ -877,10 +884,13 @@ only the successful hook path does not establish fail-closed behavior.
   property of hosted runtimes
   ([Environmental Constraints][env-constraints]). A laptop in a
   multi-player project is therefore a recorded deviation from that
-  constraint: the model never sees the token, because Git's credential
-  helper and `gh`'s store supply it to those programs, which only the
-  SCM runs, and the role cannot read or print it, but no Bridge or Gate
-  stands between the harness process and the token. #34's
+  constraint. Git's credential helper and `gh`'s store supply the token
+  to those programs, so on guard-checked calls the model never sees it
+  and the role cannot read or print it; a fail-open call can expose it
+  as that binding's row under
+  [File-source arguments](#file-source-arguments) states. In either
+  case no Bridge or Gate stands between the harness process and the
+  token. #34's
   [ceremony table](../git-integration.md#ceremony-in-each-mode) records
   both cases.
 - **The `wms` server.** In single-player mode it is a local process
@@ -900,9 +910,13 @@ only the successful hook path does not establish fail-closed behavior.
 
 IdeaBot material, repository files, and project instructions such as
 `AGENTS.md`, which harnesses load for every agent, all enter the
-agent's context. They can change what the agent says. They cannot
-change what the agent can do, because the guard and the native rules
-bound every effect ([Enforce constraints structurally][structural]).
+agent's context. They can change what the agent says. On calls that
+receive a guard decision, they cannot change what the agent can do,
+because the guard and the native rules bound every effect
+([Enforce constraints structurally][structural]). A call that a
+binding passes through without a guard decision is bounded only by the
+native rules and, in Codex, the sandbox; those cases are binding gaps
+([File-source arguments](#file-source-arguments)).
 The guard and the resume steps take the project identity from the
 working tree only, never from a caller
 ([The project root](../git-integration.md#the-project-root)).

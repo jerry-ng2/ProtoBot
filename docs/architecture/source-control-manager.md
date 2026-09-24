@@ -1631,9 +1631,12 @@ either.
 
 ### Security posture
 
-- **The role holds no Git or host credential, and runs no Git or `gh`
-  command.** The guard refuses both in the role's shell, and the binding
-  gives the role only the `scm` tools for them.
+- **The role holds no Git or host credential, and is given no Git or
+  `gh` command.** The guard refuses both in the role's shell on the
+  calls it checks, and the binding gives the role only the `scm` tools
+  for them. A call that passes without a guard decision is bounded only
+  by the binding's native rules or sandbox, which each binding records
+  ([Credentials][credentials]).
 - **Locally, the SCM narrows and does not isolate.** It runs as the user
   with the user's credentials. Every other session, agent, and terminal
   on the machine still has `git` and `gh`

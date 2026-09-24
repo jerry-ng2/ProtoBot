@@ -110,11 +110,13 @@ ProtoBot has eight primary logical components and reusable asset families:
 6. **Source Control Manager (SCM)** — The deterministic component that
    turns the user's decision about a governed object into Git and Git
    host state: commits, pushes, pull requests, refresh merges, and the
-   initialization branch. The Drafting Table reaches Git and the Git
-   host only through it, apart from the target change-set branch behavior
-   assigned to `ears-manager change-set create`. The EM-04 first release
-   writes the manifest but does not cut that branch (see the
-   [`ears-manager` CLI first-release
+   initialization branch. The Drafting Table is designed to reach Git
+   and the Git host only through it, apart from the target change-set
+   branch behavior assigned to `ears-manager change-set create`; the
+   guard enforces this on the calls it checks
+   ([Permitted Git operations](git-integration.md#permitted-git-operations)).
+   The EM-04 first release writes the manifest but does not cut that
+   branch (see the [`ears-manager` CLI first-release
    scope](ears-manager-cli.md#em-04-first-release-scope)). The Job Site
    reads approved merge commits through the SCM. It never decides content.
 7. **Validation Rules** — Domain logic that enforces well-formedness
@@ -212,7 +214,11 @@ MCP.
   commits, pushes, and opens PRs containing artifacts produced through
   `ears-manager`, through the SCM's Drafting Table face
   ([Source Control Manager](source-control-manager.md)). The Drafting
-  Table runs no Git or Git host command itself. Branch naming, commit
+  Table is given no Git or Git host command of its own; the guard
+  refuses them on the calls it checks, and what still blocks them on a
+  call without a guard decision is stated per binding in
+  [Permitted Git operations](git-integration.md#permitted-git-operations).
+  Branch naming, commit
   content, PR preparation, and the permitted Git operations are
   defined in
   [Git and Project-Repository Integration](git-integration.md).
