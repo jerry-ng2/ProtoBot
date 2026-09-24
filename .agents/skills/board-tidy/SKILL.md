@@ -198,3 +198,18 @@ Return a summary table:
 |-------|-------|-----------------|------------|
 
 Also note any excluded Backlog items and their reason.
+
+## Validating eligibility and stale-status changes
+
+Lint checks do not catch a wrong assumption about sub-issues,
+blockers, or parent status. Before merging a change to Step 3
+eligibility, Step 4 stale-status rules, or the Step 2 `items`
+shape those rules consume, run the dry-run in
+[references/board-tidy-fixture.md](references/board-tidy-fixture.md)
+against that fixture, or run Steps 1-5 on a live board without
+Step 6 mutations, and paste the before/after recommendations into
+the description of the change.
+
+Review agents must treat a missing dry-run or fixture before/after
+as a finding when the diff changes eligibility or stale-status
+logic.

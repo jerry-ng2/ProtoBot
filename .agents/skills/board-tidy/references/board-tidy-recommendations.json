@@ -1,0 +1,186 @@
+{
+  "active": {
+    "milestone_mode": "active",
+    "move_to_ready": [
+      {
+        "number": 101,
+        "title": "Unblocked milestoned item",
+        "milestone": "Sprint 1",
+        "reason": "unblocked Backlog item with an open milestone"
+      },
+      {
+        "number": 102,
+        "title": "Unblocked milestoned sub-issue",
+        "milestone": "Sprint 1",
+        "reason": "unblocked Backlog item with an open milestone"
+      },
+      {
+        "number": 106,
+        "title": "Milestoned item with closed blockers",
+        "milestone": "Sprint 1",
+        "reason": "unblocked Backlog item with an open milestone"
+      }
+    ],
+    "stale_statuses": [
+      {
+        "number": 110,
+        "title": "Closed item still In progress",
+        "status": "In progress",
+        "suggested_status": "Done",
+        "reason": "closed item is not Done"
+      },
+      {
+        "number": 111,
+        "title": "Closed sub-issue still Backlog",
+        "status": "Backlog",
+        "suggested_status": "Done",
+        "reason": "closed item is not Done"
+      },
+      {
+        "number": 112,
+        "title": "Ready item with open blocker",
+        "status": "Ready",
+        "suggested_status": "Backlog",
+        "reason": "Ready with open blockers"
+      },
+      {
+        "number": 113,
+        "title": "In progress with every blocker open",
+        "status": "In progress",
+        "suggested_status": null,
+        "reason": "In progress with open blockers"
+      },
+      {
+        "number": 115,
+        "title": "Ready item with incomplete blockers",
+        "status": "Ready",
+        "suggested_status": null,
+        "reason": "blocker data is incomplete"
+      },
+      {
+        "number": 123,
+        "title": "Backlog item with incomplete blockers",
+        "status": "Backlog",
+        "suggested_status": null,
+        "reason": "blocker data is incomplete"
+      },
+      {
+        "number": 124,
+        "title": "Closed item with incomplete blockers",
+        "status": "In progress",
+        "suggested_status": "Done",
+        "reason": "closed item is not Done"
+      },
+      {
+        "number": 125,
+        "title": "In progress with incomplete blockers",
+        "status": "In progress",
+        "suggested_status": null,
+        "reason": "blocker data is incomplete"
+      }
+    ],
+    "excluded_cross_repository": [
+      {
+        "number": 201,
+        "title": "Cross-repository unblocked item",
+        "repository_owner": "other",
+        "repository_name": "elsewhere"
+      }
+    ],
+    "excluded_non_issue": [
+      {
+        "item_id": "PVTI_fid202",
+        "content_type": "PullRequest"
+      }
+    ]
+  },
+  "none": {
+    "milestone_mode": "none",
+    "move_to_ready": [
+      {
+        "number": 103,
+        "title": "Unblocked unmilestoned item",
+        "milestone": null,
+        "reason": "unblocked Backlog item with no milestone"
+      },
+      {
+        "number": 104,
+        "title": "Unblocked unmilestoned sub-issue",
+        "milestone": null,
+        "reason": "unblocked Backlog item with no milestone"
+      }
+    ],
+    "stale_statuses": [
+      {
+        "number": 110,
+        "title": "Closed item still In progress",
+        "status": "In progress",
+        "suggested_status": "Done",
+        "reason": "closed item is not Done"
+      },
+      {
+        "number": 111,
+        "title": "Closed sub-issue still Backlog",
+        "status": "Backlog",
+        "suggested_status": "Done",
+        "reason": "closed item is not Done"
+      },
+      {
+        "number": 112,
+        "title": "Ready item with open blocker",
+        "status": "Ready",
+        "suggested_status": "Backlog",
+        "reason": "Ready with open blockers"
+      },
+      {
+        "number": 113,
+        "title": "In progress with every blocker open",
+        "status": "In progress",
+        "suggested_status": null,
+        "reason": "In progress with open blockers"
+      },
+      {
+        "number": 115,
+        "title": "Ready item with incomplete blockers",
+        "status": "Ready",
+        "suggested_status": null,
+        "reason": "blocker data is incomplete"
+      },
+      {
+        "number": 123,
+        "title": "Backlog item with incomplete blockers",
+        "status": "Backlog",
+        "suggested_status": null,
+        "reason": "blocker data is incomplete"
+      },
+      {
+        "number": 124,
+        "title": "Closed item with incomplete blockers",
+        "status": "In progress",
+        "suggested_status": "Done",
+        "reason": "closed item is not Done"
+      },
+      {
+        "number": 125,
+        "title": "In progress with incomplete blockers",
+        "status": "In progress",
+        "suggested_status": null,
+        "reason": "blocker data is incomplete"
+      }
+    ],
+    "excluded_cross_repository": [
+      {
+        "number": 201,
+        "title": "Cross-repository unblocked item",
+        "repository_owner": "other",
+        "repository_name": "elsewhere"
+      }
+    ],
+    "excluded_non_issue": [
+      {
+        "item_id": "PVTI_fid202",
+        "content_type": "PullRequest"
+      }
+    ]
+  }
+}
