@@ -156,6 +156,30 @@ agents must follow these rules:
    Blindly copying behavioral configuration from a sibling can
    produce incorrect dispatch or workflow behavior.
 
+3. **Link a GitHub issue or justify why none is needed.**
+   When reversing or correcting a business rule, link an
+   issue describing incorrect prior behavior and impact, or
+   justify in the PR description (body) with that substance
+   and why no issue was filed; comment acknowledgments do
+   not qualify. Omitting both or a vacuous justification is
+   a defect. Diffs reversing or correcting a gating
+   condition or gated action (e.g., status moves) are in
+   scope; other edits are not. Scope is determined by the
+   diff, not by how the author characterizes the PR
+   (default in-scope if uncertain).
+
+4. **Review agents must check for a linked issue or
+   justification.** When reviewing a PR that creates or
+   modifies a skill file, verify that reversing or
+   correcting a business rule links an issue describing
+   incorrect prior behavior and impact, or a PR-description
+   justification with that substance and why no issue was
+   filed. Reject comments, vacuous justifications, and
+   non-substantive issues, defaulting in-scope if uncertain.
+   Findings should include missing or inadequate issues and
+   justifications, not only formatting and
+   specification-hierarchy checks.
+
 ### Aligning skills with the specification hierarchy
 
 A skill that implements or describes a ProtoBot or Specification
