@@ -94,9 +94,11 @@ Reads are root-relative and deterministic:
 - `check`, `change-set compare`, and `impact` read the complete relevant
   store rather than trusting a caller-provided subset.
 
-The optional `--at <full-commit-sha>` selector is read-only and is accepted
-only by read and analysis commands. It must name a full 40-character commit
-present in the local repository. The default is the current working tree.
+In the target contract, the optional `--at <full-commit-sha>` selector
+provides read-revision semantics accepted only by read and analysis commands
+(deferred from the EM-04/EM-05 implemented subset to follow-on scope). It must
+name a full 40-character commit present in the local repository. The default is
+the current working tree.
 
 ### Write authority
 
@@ -576,8 +578,8 @@ explicit.
 | Command | Request | Success result | Diagnostic result |
 | --- | --- | --- | --- |
 | `change-set create` | Intent, affected interfaces/scopes, implementation decision, and `--created` | Change-set ID, full base commit, and manifest path; EM-04 does not return branch data or the manifest body | `change_set.no_base`, `change_set.invalid_scope`, or project diagnostics |
-| `change-set list` | Optional status, interface, scope, and `--at` filters | Proposed/approved manifests sorted by ID | `change_set.read_failed` |
-| `change-set show` | `--change-set CS-ID` and optional `--at` | Complete manifest, derived status, changed/applicable counts, and exact paths, each a file: every registered artifact and every structured requirement and interface record that the change set touches, and its manifest | `change_set.not_found` |
+| `change-set list` | Optional status, interface, and scope filters, and optional --at (deferred to follow-on scope) | Proposed/approved manifests sorted by ID | `change_set.read_failed` |
+| `change-set show` | `--change-set CS-ID` and optional --at (deferred to follow-on scope) | Complete manifest, derived status, changed/applicable counts, and exact paths, each a file: every registered artifact and every structured requirement and interface record that the change set touches, and its manifest | `change_set.not_found` |
 | `change-set update` | `--change-set CS-ID` plus metadata, base refresh, or complete impact assessment | `before`, `after`, `assessment_status`, and `changed_paths` in the result | `change_set.not_proposed`, `change_set.base_mismatch`, `change_set.invalid_impact`, or validation diagnostics |
 | `change-set compare` | `--change-set CS-ID` and optional `--against` full commit (deferred to follow-on scope) | Deterministic comparison report described below | `change_set.not_found`, `change_set.invalid_base`, or read/validation diagnostics |
 
