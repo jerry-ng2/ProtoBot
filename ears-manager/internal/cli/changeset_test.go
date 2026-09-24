@@ -208,7 +208,7 @@ func TestChangeSetCompareRejectsAgainstOption(t *testing.T) {
 	}
 
 	// Compare usage does not advertise deferred --against option
-	code, stdout, stderr = runCLI(nil, "change-set", "compare", "--help")
+	code, stdout, _ = runCLI(nil, "change-set", "compare", "--help")
 	if code != 0 || strings.Contains(stdout, "--against") {
 		t.Fatalf("compare help advertised deferred --against: %s", stdout)
 	}
