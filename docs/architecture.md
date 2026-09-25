@@ -699,13 +699,17 @@ must meet. [OpenCode](architecture/agent-harness/opencode.md),
 
 The Drafting Table agent interacts with external systems
 exclusively through governed tools defined by the
-Specification Toolkit. The agent never edits specification
-files directly — all reads and writes go through
-`ears-manager`. The harness guard enforces this boundary on the
-calls it checks; a call that passes without a guard decision is
-bounded only by the binding's native rules or sandbox, and the
-enforcement layers below still gate what merges
-([What the harness layer stops][layer-stops]).
+Specification Toolkit. `ears-manager` is the intended route for
+every specification read and write; the agent is not meant to
+edit specification files directly. The harness guard enforces
+this on the calls it checks. A call that passes without a guard
+decision is bounded only by the binding's native rules or
+sandbox, which may still let it edit a specification file
+directly: for example, Codex's sandbox permits writes in the
+working tree, and an admitted `ears-manager` call can redirect
+its output. The enforcement layers below do not prevent such an
+edit; they limit its impact by keeping it from being staged or
+merged ([What the harness layer stops][layer-stops]).
 
 [layer-stops]: architecture/agent-harness/adapter-contract.md#what-the-harness-layer-stops
 [permitted-git]: architecture/git-integration.md#permitted-git-operations
