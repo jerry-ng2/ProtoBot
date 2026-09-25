@@ -707,9 +707,10 @@ decision is bounded only by the binding's native rules or
 sandbox, which may still let it edit a specification file
 directly: for example, Codex's sandbox permits writes in the
 working tree, and an admitted `ears-manager` call can redirect
-its output. The enforcement layers below do not prevent such an
-edit; they limit its impact by keeping it from being staged or
-merged ([What the harness layer stops][layer-stops]).
+its output. The SCM's pre-stage digest comparison and the
+enforcement layers below do not prevent such an edit; they limit
+its impact by keeping it from being committed or merged
+([What the harness layer stops][layer-stops]).
 
 [layer-stops]: architecture/agent-harness/adapter-contract.md#what-the-harness-layer-stops
 [permitted-git]: architecture/git-integration.md#permitted-git-operations
@@ -737,8 +738,11 @@ stops](architecture/agent-harness/adapter-contract.md#what-the-harness-layer-sto
 - **All specification mutations go through `ears-manager`.**
   The Drafting Table creates, reads, updates, and retires
   requirements and interfaces via `ears-manager` subcommands.
-  The Drafting Table never writes specification files directly
-  to the working tree.
+  The Drafting Table is not meant to write specification files
+  directly to the working tree; the guard enforces this on the
+  calls it checks, and a call without a guard decision is limited
+  as described in
+  [Governed tool integrations](#governed-tool-integrations).
 - **All work-item mutations go through the WMS Adapter API.**
   The Drafting Table reads work-item state for display, queries
   blocked items, and submits reviewed resolutions. Validation

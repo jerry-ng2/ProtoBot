@@ -713,7 +713,7 @@ ceremony and the credential path differ.
 | Who approves | The author merges their own pull request. No reviewer is required. | A reviewer merges; CODEOWNERS and required reviews apply |
 | Registration trigger | Local `register-approved-change-set` | Merge hook on the default branch |
 | Where the [Source Control Manager](source-control-manager.md#deployment-topology) runs | On the user's machine, started by the harness binding | On each contributor's machine for a local harness; hosted behind the Gate for the Web Drafting Table |
-| Git host credential | The user's own Git host token, used by the SCM | On a local harness, the user's own token through Git's credential helper and `gh`, used by the SCM and never readable by the role ([#33 Credentials](agent-harness/adapter-contract.md#credentials)); hosted and Web, OAuth 2.1 through the Bridge/Gate pattern, and the agent runtime never sees the credential |
+| Git host credential | The user's own Git host token, used by the SCM | On a local harness, the user's own token through Git's credential helper and `gh`, used by the SCM and not readable by the role on guard-checked calls; a fail-open call can expose it ([#33 Credentials](agent-harness/adapter-contract.md#credentials)); hosted and Web, OAuth 2.1 through the Bridge/Gate pattern, and the agent runtime never sees the credential |
 | Merge strategy | Merge commit | Merge commit |
 | Where code lands | Job Site merges `wi/` branches | Identical |
 
@@ -739,10 +739,12 @@ project; it does not change any rule in this document.
 
 ## Ungoverned-edit detection
 
-The Drafting Table never writes a registered specification file
-directly, and neither does anything else. A file edited outside
-`ears-manager` must be rejected or caught before it can reach the
-default branch. Four layers do that, in order of how early they
+No component is meant to write a registered specification file
+directly; for the Drafting Table the guard enforces this on the calls
+it checks, and a call without a guard decision may still write one
+([File-source arguments][fail-open]). A file edited outside
+`ears-manager`, by any route, must be rejected or caught before it can
+reach the default branch. Four layers do that, in order of how early they
 fire.
 
 | Layer | Where | Catches |

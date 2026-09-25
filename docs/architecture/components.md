@@ -209,7 +209,11 @@ MCP.
   performs the expected-state transition during contract refresh.
 - **To `ears-manager`:** Reads and writes every registered specification
   artifact, including Vision/Architecture prose and external interface
-  IDLs. The Drafting Table never edits spec files directly.
+  IDLs. The Drafting Table is not meant to edit spec files directly;
+  the guard refuses such edits on the calls it checks, and what a call
+  without a guard decision can still do is stated in
+  [What the harness layer
+  stops](agent-harness/adapter-contract.md#what-the-harness-layer-stops).
 - **To Source Control Manager (via MCP):** Reads repository state,
   commits, pushes, and opens PRs containing artifacts produced through
   `ears-manager`, through the SCM's Drafting Table face

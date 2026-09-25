@@ -848,7 +848,7 @@ enforcement:
 | --- | --- | --- | --- |
 | [OpenCode](opencode.md) | The plugin is absent or no hook is registered; native Bash permissions have no plugin-presence check | The `ears-manager *` allow rule still admits the command, including non-`-` file-source values, `--text "$GH_TOKEN"`, output redirection, and other shell syntax that only the guard rejects; a `read` of an in-project credential file other than `.env` | Every other shell command, including `git` and `gh` (`"*": deny`); reads of `.env`, `.git/`, and `.protobot/` stores; hidden file-writing, subagent, and web tools |
 | [Claude Code](claude-code.md) | The hook times out, is killed, or its shim cannot run | No status 2 is returned, so an `ears-manager` call may proceed with a non-`-` value, such as a credential file, or with variable expansion such as `--text "$GH_TOKEN"`; a `Read` of a credential file outside the native denies, including one outside the project | Every shell command without an allow rule, including `git` and `gh` (`dontAsk`); reads of `.env`, `.git/`, and `.protobot/` stores; hidden file-writing, subagent, and web tools |
-| [Codex](codex.md) | The hook is untrusted outside the launcher, crashes, exits other than 2, or times out | The call may proceed with a non-`-` value or variable expansion; any shell command, including Git reads; the sandbox bounds writes, not reads, so a host credential file can reach the model or governed state, and the sandbox does not establish the source of bytes read into governed state | Writes outside the working tree and `$TMPDIR`, writes under `.git/`, and shell network access, so Git writes and Git host calls fail; hidden web and subagent tools |
+| [Codex](codex.md) | The hook is untrusted outside the launcher, crashes, exits other than 2, or times out | The call may proceed with a non-`-` value or variable expansion; any shell command, including Git reads; an `apply_patch` write in the working tree, including `.protobot/` and registered paths; the sandbox bounds writes, not reads, so a host credential file can reach the model or governed state, and the sandbox does not establish the source of bytes read into governed state | Writes outside the working tree and `$TMPDIR`, writes under `.git/`, and shell network access, so Git writes and Git host calls fail; hidden web and subagent tools |
 
 The binding status and fixture must keep these failure modes visible. A
 call with no guard decision is not a refusal, and a fixture that exercises
@@ -902,7 +902,9 @@ only the successful hook path does not establish fail-closed behavior.
   credentials downstream
   ([Authentication and Credential Isolation][credential-isolation]).
   The harness keeps that token in its own store outside the project,
-  where the role's reads cannot reach it (H13).
+  where the role's guard-checked reads cannot reach it (H13); a
+  fail-open read outside the project can, in the bindings whose row
+  under [File-source arguments](#file-source-arguments) admits one.
 - **The harness's own model credentials** belong to the harness and its
   user. The adapter neither reads nor configures them.
 
@@ -922,8 +924,10 @@ working tree only, never from a caller
 ([The project root](../git-integration.md#the-project-root)).
 
 IdeaBot material enters as pasted text or as a file attached to the
-user's prompt. The role does not read IdeaBot files outside the
-project, and nothing in the adapter depends on IdeaBot input
+user's prompt. On guard-checked calls the role does not read
+IdeaBot files outside the project; a fail-open call is limited as
+the paragraph above states. Nothing in the adapter depends on IdeaBot
+input
 ([IdeaBot material](../git-integration.md#ideabot-material)).
 
 ---
