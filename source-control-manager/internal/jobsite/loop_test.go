@@ -305,9 +305,10 @@ func loopTestRequest(t *testing.T, faults []Fault, retries int) (LoopRequest, *[
 		Triage: func(_ context.Context, run TestRun, cycle int) (TriageInput, error) {
 			fault := faults[cycle-1]
 			outcome := "fail"
-			if fault == FaultNone {
+			switch fault {
+			case FaultNone:
 				outcome = "pass"
-			} else if fault == FaultSpecificationGap {
+			case FaultSpecificationGap:
 				outcome = "blocked"
 			}
 			return TriageInput{Outcome: outcome, Fault: fault, RequirementIDs: []string{"REQ-1"}, Reason: loopPrivateSentinel, RawLogs: run.Stdout + run.Stderr + loopPrivateSentinel, InspectorFindings: loopPrivateSentinel}, nil
