@@ -33,6 +33,8 @@ type CycleMerge struct {
 // in Integration's object database; Worker Git objects are never imported.
 // Rejection leaves Integration HEAD and role refs unchanged, and returns a
 // non-nil result carrying the private rejection audit.
+// Callers must serialize MergeCycle and RecoverCycleAudits operations for
+// the same private Integration repository, as the fenced fixture owner does.
 func MergeCycle(integration Repository, policy Policy, input CycleImport) (*CycleMerge, error) {
 	if integration.Role != RoleIntegration {
 		return nil, fail(CodePatchRejected, "Cycle imports require the private Integration repository.")
@@ -48,6 +50,9 @@ func MergeCycle(integration Repository, policy Policy, input CycleImport) (*Cycl
 	}
 	result := &CycleMerge{Base: base}
 	auditDir := filepath.Join(filepath.Dir(integration.Path), auditDirName)
+	if err := recoverCycleAudits(repo, auditDir); err != nil {
+		return result, err
+	}
 	reject := func(bundle PatchBundle, code, reason string) (*CycleMerge, error) {
 		result.Commit = ""
 		record := cyclePatchAudit(policy, bundle, DecisionReject, reason, "")
@@ -93,6 +98,7 @@ func MergeCycle(integration Repository, policy Policy, input CycleImport) (*Cycl
 		return reject(input.WorkerA, CodePatchRejected, "Integration must be clean before importing a cycle.")
 	}
 	var refs, commits []string
+	var audits []cycleAudit
 	var combinedOps []Operation
 	result.Commit = base
 	for _, bundle := range bundles {
@@ -124,58 +130,70 @@ func MergeCycle(integration Repository, policy Policy, input CycleImport) (*Cycl
 		}
 		refs = append(refs, fmt.Sprintf("refs/heads/integration/%s/cycle-%d", bundle.Role, bundle.Cycle))
 		commits = append(commits, contribution)
+		audit, err := newCycleAudit(repo, cyclePatchAudit(policy, bundle, DecisionAccept, "", contribution))
+		if err != nil {
+			result.Commit = ""
+			return result, err
+		}
+		audits = append(audits, audit)
 	}
 	var transaction strings.Builder
 	transaction.WriteString("start\n")
 	for index, ref := range refs {
 		fmt.Fprintf(&transaction, "create %s %s\n", ref, commits[index])
 	}
+	for _, audit := range audits {
+		fmt.Fprintf(&transaction, "create %s %s\n", audit.Ref, audit.OID)
+	}
 	fmt.Fprintf(&transaction, "update refs/heads/%s %s %s\nprepare\ncommit\n", branchMain, result.Commit, base)
 	if err := cycleRefTransaction(repo, transaction.String()); err != nil {
 		return reject(bundles[0], CodePatchStale, "Cycle baseline or contribution refs changed before publication.")
 	}
+	for _, audit := range audits {
+		result.Patches = append(result.Patches, audit.Record)
+	}
+	return result, finishCyclePublication(repo, auditDir, result, refs, commits, audits)
+}
+
+func finishCyclePublication(repo *gitRepo, auditDir string, result *CycleMerge, refs, commits []string, audits []cycleAudit) error {
 	var auditNames []string
-	rollback := func(cause error) (*CycleMerge, error) {
-		for _, name := range auditNames {
-			_ = os.Remove(filepath.Join(auditDir, name))
-		}
-		var transaction strings.Builder
-		fmt.Fprintf(&transaction, "start\nupdate refs/heads/%s %s %s\n", branchMain, base, result.Commit)
-		for index, ref := range refs {
-			fmt.Fprintf(&transaction, "delete %s %s\n", ref, commits[index])
-		}
-		transaction.WriteString("prepare\ncommit\n")
-		rbErr := cycleRefTransaction(repo, transaction.String())
-		if rbErr == nil {
-			rbErr = repo.checkout(branchMain)
-		}
-		if rbErr != nil {
-			return result, fail(CodePatchRollbackFailed, fmt.Sprintf("Cycle publication rollback failed: %v.", errors.Join(cause, rbErr)))
-		}
-		result.Commit = ""
-		result.Patches = nil
-		return result, cause
+	finishErr := repo.checkout(branchMain)
+	if finishErr == nil {
+		finishErr = repo.scrubMeta()
 	}
-	if err := repo.checkout(branchMain); err != nil {
-		return rollback(err)
+	if finishErr == nil {
+		auditNames, finishErr = writeCycleAuditViews(auditDir, audits)
 	}
-	if err := repo.scrubMeta(); err != nil {
-		return rollback(err)
+	if finishErr == nil {
+		return nil
 	}
-	for index, bundle := range bundles {
-		commit := commits[index]
-		record := cyclePatchAudit(policy, bundle, DecisionAccept, "", commit)
-		name, err := uniqueAuditName(auditDir, "accepted", bundle.BundleDigest)
-		if err != nil {
-			return rollback(err)
+	// Accepted evidence remains pinned until the same atomic rollback removes
+	// HEAD, contribution refs, and audit refs. Never delete views first: a
+	// failed ref rollback must retain all evidence of the published cycle.
+	var transaction strings.Builder
+	fmt.Fprintf(&transaction, "start\nupdate refs/heads/%s %s %s\n", branchMain, result.Base, result.Commit)
+	for index, ref := range refs {
+		fmt.Fprintf(&transaction, "delete %s %s\n", ref, commits[index])
+	}
+	for _, audit := range audits {
+		fmt.Fprintf(&transaction, "delete %s %s\n", audit.Ref, audit.OID)
+	}
+	transaction.WriteString("prepare\ncommit\n")
+	if err := cycleRefTransaction(repo, transaction.String()); err != nil {
+		return fail(CodePatchRollbackFailed, fmt.Sprintf("Cycle publication rollback failed: %v.", errors.Join(finishErr, err)))
+	}
+	result.Commit = ""
+	result.Patches = nil
+	rollbackErr := repo.checkout(branchMain)
+	for _, name := range auditNames {
+		if err := os.Remove(filepath.Join(auditDir, name)); err != nil && !os.IsNotExist(err) {
+			rollbackErr = errors.Join(rollbackErr, err)
 		}
-		if err := writeAuditExcl(auditDir, name, record); err != nil {
-			return rollback(err)
-		}
-		auditNames = append(auditNames, name)
-		result.Patches = append(result.Patches, record)
 	}
-	return result, nil
+	if rollbackErr != nil {
+		return fail(CodePatchRollbackFailed, fmt.Sprintf("Cycle publication rollback cleanup failed: %v.", errors.Join(finishErr, rollbackErr)))
+	}
+	return finishErr
 }
 
 func cyclePairMismatch(input CycleImport) string {

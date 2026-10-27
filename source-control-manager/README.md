@@ -46,6 +46,12 @@ private Integration repositories. Workers edit only their role projection
 through a sandbox `Session`. The loop validates path-restricted PatchBundle
 v1 imports, preserves contributions on private integration-side branches,
 merges them with merge commits, and runs the supplied Integration test.
+Accepted patch audit records are pinned in the same atomic Git ref
+transaction as the integration commits. Audit JSON sidecars are derived
+views; `RecoverCycleAudits` rebuilds them from those private Git records
+before another import. Rollback restores refs before removing sidecars
+and reports cleanup failures. Imports and recovery for the same Integration
+repository run serially under its single Job Site owner.
 Fixture Triage represents test faults, implementation faults, both faults,
 and specification gaps. Later cycles dispatch only the Workers selected
 by the preceding sanitized feedback.

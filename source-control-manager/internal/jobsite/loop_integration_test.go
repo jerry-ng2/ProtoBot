@@ -160,7 +160,7 @@ func TestMergeCycleCanImportOnlyRoutedRoleOnRetry(t *testing.T) {
 	}
 }
 
-func TestMergeCycleRollsBackPublicationWhenAuditCannotBeRecorded(t *testing.T) {
+func TestMergeCycleRejectsInvalidAuditDirectoryBeforePublication(t *testing.T) {
 	exported := newCycleExport(t)
 	auditDir := filepath.Join(filepath.Dir(exported.Integration.Path), auditDirName)
 	if err := os.RemoveAll(auditDir); err != nil {
