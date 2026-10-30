@@ -15,6 +15,7 @@ import (
 // LoopVersion identifies the backend-neutral Worker/Triage fixture pipeline.
 const LoopVersion = "jobsite-worker-triage/v1"
 
+// Terminal fixture loop outcomes.
 const (
 	LoopPassed         = "passed"
 	LoopSpecGap        = "specification-gap"
@@ -106,6 +107,8 @@ type CycleEvidence struct {
 // LoopReport is control-plane evidence, not a Worker response. Passed means
 // ready for Inspecting, never completed. A terminal fixture escalation does
 // not invent a WMS transition or authorize abandonment.
+// State and ContractVersion reflect the last applied decision, or the
+// requested pre-claim snapshot when no claim was applied.
 type LoopReport struct {
 	Version           string           `json:"version"`
 	WorkItem          string           `json:"work_item"`
@@ -158,12 +161,6 @@ func RunFixtureLoop(ctx context.Context, req LoopRequest) (report *LoopReport, r
 	}
 	if err := lifecycle.claim(); err != nil {
 		return report, err
-	}
-	// A complete fixture run is single-use. Replaying a historical claim
-	// does not prove the live item is still Building under this lease.
-	// Resumption requires reconciliation beyond this deterministic fixture.
-	if lifecycle.transitions[0].Decision.Decision.Replayed {
-		return report, fmt.Errorf("worker/triage fixture run identity was already claimed; reconcile before starting another run")
 	}
 	sourceRoot, sourceCommit := req.SourceRoot, req.SourceCommit
 	feedback := []WorkerFeedback{{Role: RoleWorkerA}, {Role: RoleWorkerB}}

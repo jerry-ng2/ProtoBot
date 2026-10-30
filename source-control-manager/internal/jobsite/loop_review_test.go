@@ -105,6 +105,13 @@ func TestWorkerTriageFixtureRejectsReplayedRunIdentity(t *testing.T) {
 	if len(report.Transitions) != 1 || !report.Transitions[0].Decision.Decision.Replayed {
 		t.Fatalf("replayed claim is absent from private evidence: %#v", report.Transitions)
 	}
+	if report.State != validation.StateReadyForBuilding || report.ContractVersion != req.ContractVersion {
+		t.Fatalf("replayed claim replaced the requested pre-claim snapshot: %s v%d", report.State, report.ContractVersion)
+	}
+	transition := report.Transitions[0]
+	if transition.After != transition.Before || transition.ContractVersion != req.ContractVersion || transition.Decision.Decision.After.State != validation.StateBuilding {
+		t.Fatalf("historical decision was promoted or omitted from evidence: %#v", transition)
+	}
 	verifyLoopTestEvidence(t, req.OutputDir, report)
 }
 

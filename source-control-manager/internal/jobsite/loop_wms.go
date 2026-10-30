@@ -16,7 +16,7 @@ type LoopWMS interface {
 }
 
 // LoopTransition records one lifecycle request and the authoritative WMS
-// response. Rejected requests retain the previously observed state/version.
+// response. Rejected requests and replayed claims retain the prior state/version.
 // This evidence is private control-plane data, never Worker feedback.
 type LoopTransition struct {
 	Operation       string           `json:"operation"`
@@ -127,6 +127,12 @@ func (l *loopLifecycle) call(operation validation.Operation, cycle int, payload 
 		decision.After == nil || decision.After.State != target || decision.After.ContractVersion != l.version+1 ||
 		(operation == validation.OperationClaim && decision.FencingTokenIssued == "") {
 		return fmt.Errorf("worker/triage lifecycle %s returned invalid authoritative evidence", operation)
+	}
+	// A fixture run is single-use. A historical claim cannot establish
+	// current ownership without reconciliation. Keep its raw decision in
+	// the audit, but do not promote its state, version, or fencing token.
+	if operation == validation.OperationClaim && decision.Replayed {
+		return fmt.Errorf("worker/triage fixture run identity was already claimed; reconcile before starting another run")
 	}
 	l.state = decision.After.State
 	l.version = decision.After.ContractVersion

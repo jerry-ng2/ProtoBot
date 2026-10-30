@@ -371,7 +371,7 @@ func verifyLoopTestEvidence(t *testing.T, dir string, report *LoopReport) {
 		t.Fatal(err)
 	}
 	var recorded LoopReport
-	if err := json.Unmarshal(data, &recorded); err != nil || recorded.Terminal != report.Terminal || recorded.ContractVersion != report.ContractVersion {
+	if err := json.Unmarshal(data, &recorded); err != nil || recorded.Terminal != report.Terminal || recorded.State != report.State || recorded.ContractVersion != report.ContractVersion {
 		t.Fatal("persisted report differs from result")
 	}
 	info, err := os.Stat(dir)

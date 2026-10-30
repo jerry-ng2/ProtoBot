@@ -148,26 +148,31 @@ func TestLoopLifecycleRejectsStaleVersionAndFence(t *testing.T) {
 	})
 }
 
-func TestLoopLifecycleLostResponseReplayIsIdempotent(t *testing.T) {
+func TestLoopLifecycleRejectsReplayedClaimWithoutPromotingOwnership(t *testing.T) {
 	wms := lifecycleTestWMS(t)
 	first := newLoopLifecycle(wms, "loop-actor", "WI-69", "run-lost-response", 4)
 	if err := first.claim(); err != nil {
 		t.Fatal(err)
 	}
-	// A caller that lost its response restarts from the same pre-claim
-	// snapshot and run identity. The exact request key replays the claim.
+	before, _ := wms.WorkItem("WI-69")
+	// The exact request key replays the historical claim. This fixture
+	// cannot reconcile current ownership, so it must refuse resumption.
 	retry := newLoopLifecycle(wms, "loop-actor", "WI-69", "run-lost-response", 4)
-	if err := retry.claim(); err != nil {
-		t.Fatal(err)
+	if err := retry.claim(); err == nil || !strings.Contains(err.Error(), "run identity was already claimed") {
+		t.Fatalf("replayed claim error = %v", err)
 	}
-	if retry.fence != first.fence || retry.state != first.state || retry.version != first.version || len(wms.Events()) != 1 || !retry.transitions[0].Decision.Decision.Replayed {
-		t.Fatalf("claim replay minted ownership or mutated twice: %#v", retry.transitions)
+	after, _ := wms.WorkItem("WI-69")
+	if retry.fence != "" || retry.state != validation.StateReadyForBuilding || retry.version != 4 || len(wms.Events()) != 1 || !reflect.DeepEqual(before, after) {
+		t.Fatalf("claim replay promoted historical ownership or mutated the WMS: %#v", retry)
 	}
-	if err := retry.testsPass(1); err != nil {
+	if len(retry.transitions) != 1 || !retry.transitions[0].Decision.Decision.Replayed || retry.transitions[0].After != validation.StateReadyForBuilding || retry.transitions[0].ContractVersion != 4 {
+		t.Fatalf("replayed claim audit = %#v", retry.transitions)
+	}
+	if err := first.testsPass(1); err != nil {
 		t.Fatal(err)
 	}
 	if len(wms.Events()) != 2 {
-		t.Fatal("replayed fence did not authorize the one Building gate")
+		t.Fatal("original claim did not authorize the one Building gate")
 	}
 }
 
